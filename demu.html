@@ -1,0 +1,2744 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Demu — Sign Language Recognition</title>
+  <link rel="shortcut icon" href="pictures/logo.png" type="image/x-icon">
+
+  <!-- Tailwind (keeps your original Tailwind-based styles) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'ui-sans-serif', 'system-ui', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial']
+          },
+          colors: {
+            brand: {
+              50: '#e6fffb', 100: '#b3fff3', 200: '#80ffeb', 300: '#4dffe4', 400: '#1affdc', 500: '#0bd4bf',
+              600: '#06a89a', 700: '#067d74', 800: '#065e58', 900: '#064b46'
+            }
+          },
+          boxShadow: { glow: '0 0 0 3px rgba(11, 212, 191, 0.25)' }
+        }
+      }
+    };
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+
+
+
+  <style>
+
+
+/* --- Digital Scan Box --- */
+.digital-scan {
+  position: relative;
+  width: 100%;
+  height: 300px;
+  background: radial-gradient(circle at center, rgba(11,212,191,0.05) 0%, rgba(0,0,0,0.9) 70%);
+  border: 2px solid #0bd4bf;
+  border-radius: 14px;
+  overflow: hidden;
+  margin-top: 30px;
+}
+
+/* moving scanning beam */
+.digital-scan::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  background: linear-gradient(to bottom, rgba(11,212,191,0.4), rgba(11,212,191,0));
+  animation: scanDown 3s linear infinite;
+}
+
+@keyframes scanDown {
+  0% { top: -50%; }
+  100% { top: 100%; }
+}
+
+/* grid overlay */
+.digital-scan::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(to right, rgba(11,212,191,0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(11,212,191,0.12) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+
+/* --- SCANNING TEXT (glitchy hologram effect) --- */
+.scan-text {
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: #0bd4bf;
+  text-shadow: 0 0 6px rgba(11,212,191,0.8), 0 0 20px rgba(11,212,191,0.6);
+  animation: flicker 2s infinite;
+  position: relative;
+}
+
+/* flicker / glitch */
+@keyframes flicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; }
+  20%, 24%, 55% { opacity: 0.3; }
+}
+
+.scan-text::before,
+.scan-text::after {
+  content: "SCANNING...";
+  position: absolute;
+  left: 0;
+  width: 100%;
+  color: #0bd4bf;
+  opacity: 0.7;
+  clip: rect(0, 0, 0, 0);
+  animation: glitch 2s infinite;
+}
+
+.scan-text::before {
+  left: 2px;
+  text-shadow: -2px 0 red;
+  animation-delay: .2s;
+}
+
+.scan-text::after {
+  left: -2px;
+  text-shadow: -2px 0 blue;
+  animation-delay: .4s;
+}
+
+@keyframes glitch {
+  0% { clip: rect(0, 9999px, 0, 0); }
+  5% { clip: rect(10px, 9999px, 50px, 0); }
+  10% { clip: rect(85px, 9999px, 140px, 0); }
+  15% { clip: rect(40px, 9999px, 80px, 0); }
+  20% { clip: rect(10px, 9999px, 50px, 0); }
+  25% { clip: rect(70px, 9999px, 120px, 0); }
+  30% { clip: rect(0, 9999px, 0, 0); }
+  100% { clip: rect(0, 9999px, 0, 0); }
+}
+
+/* --- Add this inside the <style> tag --- */
+
+  .home-nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(11, 212, 191, 0.3);
+  border-radius: 16px;
+  color: #fff;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.home-nav-btn:hover {
+  background: rgba(11, 212, 191, 0.1);
+  transform: translateY(-4px);
+  border-color: #0bd4bf;
+  box-shadow: 0 0 15px rgba(11, 212, 191, 0.2);
+}
+
+.home-nav-btn img {
+  width: 32px;  /* Adjust size as needed */
+  height: 32px;
+  object-fit: contain;
+}
+
+/* --- A–Z letters inside scanner --- */
+.az-stream {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  font-family: monospace;
+  font-size: 1rem;
+  color: rgba(11,212,191,0.6);
+  display: flex;
+  justify-content: space-around;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.az-column {
+  display: flex;
+  flex-direction: column;
+  animation: scrollLetters 6s linear infinite;
+}
+
+@keyframes scrollLetters {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+
+    /* ---------- Left sidebar layout (keeps the app-studio look) ---------- */
+    :root{ --sidebar-w:260px; }
+    body{ font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin:0; min-height:100vh; background:#0b1220; color:#fff; }
+    .layout { display:flex; min-height:100vh; }
+    /* Sidebar */
+    .leftbar {
+      width:var(--sidebar-w); min-width:var(--sidebar-w);
+      background: linear-gradient(180deg, rgba(0, 0, 0, 0.568), rgba(255,255,255,0.01));
+      border-right:1px solid rgba(255,255,255,0.03);
+      padding:24px 16px; box-shadow: 0 6px 30px rgba(2,6,23,0.6);
+      position:sticky; top:0; height:100vh;
+      display:flex; flex-direction:column; gap:16px;
+    }
+    .leftbar .brand { display:flex; gap:12px; align-items:center; }
+    .leftbar img.logo { width:46px; height:46px; border-radius:10px; object-fit:cover; }
+    .leftbar nav { display:flex; flex-direction:column; gap:8px; margin-top:12px; }
+    .leftbar .menu-btn {
+      display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:12px;
+      color: #eaf6ff; font-weight:600; cursor:pointer; background:transparent; border: none; text-align:left;
+    }
+    .leftbar .menu-btn:hover { transform: translateX(6px); background: rgba(255,255,255,0.02); }
+    .leftbar .menu-btn.active { background: linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02)); box-shadow: 0 8px 30px rgba(124,108,255,0.06); }
+    .main { flex:1; padding:28px 36px; overflow:auto; }
+
+    /* --- New Left Sidebar Logic --- */
+:root { --sidebar-w: 260px; --sidebar-w-collapsed: 80px; }
+
+.leftbar {
+  /* Existing styles... */
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  transition: width 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px; /* Adjusted padding */
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  box-sizing: border-box;
+}
+
+/* Collapsed state */
+.leftbar.collapsed {
+  width: var(--sidebar-w-collapsed);
+  min-width: var(--sidebar-w-collapsed);
+}
+
+.leftbar.collapsed .label,
+.leftbar.collapsed .brand-text {
+  display: none;
+}
+
+.leftbar.collapsed .menu-btn {
+    justify-content: center;
+}
+
+/* Main content adjustment */
+.layout {
+    display: flex;
+    min-height: 100vh;
+}
+.main {
+    flex: 1;
+    padding: 28px 36px;
+    overflow: auto;
+}
+
+/* Menu Button Style adjustments */
+.leftbar .menu-btn {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    color: #eaf6ff;
+    font-weight: 600;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    text-align: left;
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.leftbar .menu-btn .icon img {
+  width: 38px;   /* adjust mo dito */
+  height: 38px;  /* adjust mo dito */
+  object-fit: contain; /* para hindi ma-stretch */
+}
+
+
+.leftbar.collapsed .menu-btn:hover {
+    transform: scale(1.1);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+/* Brand logo and text alignment */
+.leftbar .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-left: 12px; /* aligns with menu icons */
+}
+.leftbar.collapsed .brand {
+    justify-content: center;
+    padding-left: 0;
+}
+
+.leftbar nav {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.bottom-menu {
+    margin-top: 0;
+    padding-top: 16px;
+    border-top: 1px solid rgba(255,255,255,0.03);
+}
+
+/* Toggle Button */
+.toggle-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.2s ease, right 0.3s ease;
+    color: #fff;
+}
+
+.leftbar.collapsed .toggle-btn {
+    right: -18px; /* half of the button width */
+    transform: translateX(0);
+}
+
+.leftbar.collapsed .toggle-btn:hover {
+  transform: translateX(4px);
+}
+
+.toggle-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(1.1);
+}
+
+    body {
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      font-family: Arial, sans-serif;
+
+      /* Correct background syntax */
+      background: url("pictures/walll.jpg") no-repeat center center fixed;
+      background-size: cover;
+      color: rgba(255, 255, 255, 0), 0, 0);
+    }
+
+    .content {
+      text-align: center;
+      padding-top: 20%;
+    }
+
+    h1 {
+      font-size: 3em;
+      text-shadow: 0 4px 12px rgba(0,0,0,0.7);
+    }
+
+    /* Mobile adjustments: hide leftbar and show top header previously used */
+    @media (max-width: 900px){
+      .leftbar { display:none; }
+      .mobile-top { display:block; position:sticky; top:0; z-index:40; background:linear-gradient(180deg, rgba(11,18,32,0.8), rgba(11,18,32,0.6)); padding:10px 14px; }
+      .main { padding:16px; }
+    }
+    /* hide default header nav from the user's file (we'll keep it but not collide) */
+    .original-header { display:none; }
+    @media (max-width:900px){ .original-header { display:block; } }
+
+    /* Keep the rest of your original custom classes intact */
+    .big-letter { font-weight: 900; pointer-events: none; user-select: none; color: #ffffff;
+      text-shadow: 0 6px 18px rgba(0,0,0,0.8), 0 2px 6px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.02);
+      border-radius: 12px; border: 1px solid rgba(255,255,255,0.04); box-shadow: 0 6px 18px rgba(2,6,23,0.6); transition: transform .12s ease, opacity .12s ease;
+    }
+    @media (min-width: 1280px) { .big-letter { width: 220px; height: 220px; font-size: 180px; }  }
+    @media (min-width: 768px) and (max-width: 1279px) { .big-letter { width: 180px; height: 180px; font-size: 140px; } }
+    @media (max-width: 767px) { .big-letter { width: 120px; height: 120px; font-size: 84px; } }
+
+    /* keep splash style from your file */
+    #splashScreen{
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background-color: #0b1220; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; z-index: 1000; transition: opacity .5s ease, visibility .5s ease;
+    }
+    #splashScreen.hidden{ opacity:0; visibility:hidden; }
+    #splashLogo{ animation: logo-grow 1s ease-in-out forwards; }
+    #splashTagline{ opacity:0; transform: translateY(10px); animation: tagline-fade 1s ease-in-out 0.8s forwards; }
+    @keyframes logo-grow { 0%{ transform:scale(.5); opacity:0 } 100%{ transform:scale(1); opacity:1 } }
+    @keyframes tagline-fade { 0%{ opacity:0; transform: translateY(10px) } 100%{ opacity:1; transform: translateY(0) } }
+
+    /* t2s small helper */
+    .t2s-container { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius: 12px; padding: 18px; }
+    .t2s-input { width: 100%; padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.04); color: #fff; }
+    .t2s-output { margin-top: 16px; padding: 12px; min-height: 120px; border-radius: 10px; border: 1px dashed rgba(255,255,255,0.06); display:flex; flex-wrap:wrap; gap:10px; justify-content:center; align-items:center; }
+    .t2s-sign img { width:72px; height:72px; object-fit:contain; border-radius:6px; }
+
+  
+#sign { background: rgba(0, 0, 0, 0.7);
+  padding: 40px 20px;
+  border-radius: 16px; }
+  
+#handnumber { background: rgba(0, 0, 0, 0.7);
+  padding: 40px 20px;
+  border-radius: 16px; }
+  
+  #handnumber { background: rgba(0, 0, 0, 0.7);
+  padding: 40px 20px;
+  border-radius: 16px; }
+  
+#text2sign { background: rgba(0, 0, 0, 0.7);
+  padding: 40px 20px;
+  border-radius: 16px; }
+#voice {background: rgba(0, 0, 0, 0.7);
+  padding: 40px 20px;
+  border-radius: 16px; }
+#settings { background: rgba(0, 0, 0, 0.7);
+  padding: 40px 20px;
+  border-radius: 16px; }
+
+
+  </style>
+
+<style>
+
+  /* ------------------------------ */
+  /* RESPONSIVE LAYOUT FIXES */
+  /* ------------------------------ */
+  
+  /* Sidebar becomes sliding menu on small screens */
+  @media (max-width: 1024px) {
+    .leftbar {
+      position: fixed;
+      left: -260px;
+      top: 0;
+      height: 100vh;
+      transition: left 0.3s ease;
+      z-index: 999;
+    }
+  
+    .leftbar.open {
+      left: 0;
+    }
+  
+    /* Show a small hamburger icon on mobile */
+    .mobile-menu-btn {
+      display: flex;
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      background: rgba(255,255,255,0.1);
+      padding: 10px 12px;
+      border-radius: 8px;
+      z-index: 1000;
+      cursor: pointer;
+    }
+  }
+  
+  /* Main content should always resize automatically */
+  .main {
+    width: 100%;
+    overflow-x: hidden;
+  }
+  
+  /* Prevent elements from overflowing on mobile */
+  img, video, canvas {
+    max-width: 100%;
+    height: auto;
+  }
+  
+  .big-letter {
+    width: clamp(120px, 40vw, 220px);
+    height: clamp(120px, 40vw, 220px);
+    font-size: clamp(60px, 20vw, 180px);
+  }
+  
+  /* Fix grid layouts on small screens */
+  @media (max-width: 900px) {
+    .grid {
+      grid-template-columns: 1fr !important;
+    }
+  }
+  
+  
+  </style>
+    
+
+</head>
+<body class="antialiased">
+
+  
+
+  
+  <!-- Splash (same as your file) -->
+  <div id="splashScreen">
+    <div id="splashLogo" class="w-100 h-100 rounded-xl bg-brand-600 ] grid place-items-center mb-4">
+      <!-- small logo svg -->
+      <video autoplay muted playsinline id="introVideo">
+        <source src="pictures/demuvid.mp4" type="video/mp4">
+      </video>
+    </div>
+    <div id="splashTagline" class="text-3xl font-extrabold tracking-tight"></div>
+   
+  </div>
+  <!-- Layout: Left sidebar + main -->
+  <button id="globalMenuToggle" aria-label="Toggle Menu" style="display: none;">
+    <svg id="menuIcon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+</button>
+
+<div id="menuOverlay"></div>
+
+<aside id="expandableSidebar">
+    <nav class="menu-nav">
+        <button class="menu-item active" data-target="home">Home <span class="arrow">→</span></button>
+        <button class="menu-item" data-target="about">About Us <span class="arrow">→</span></button>
+        <button class="menu-item" data-target="sign">Hand Alphabet Detection <span class="arrow">→</span></button>
+        <button class="menu-item" data-target="handnumber">Hand Number Detection <span class="arrow">→</span></button>
+        <button class="menu-item" data-target="text2sign">Chat To Sign <span class="arrow">→</span></button>
+        <button class="menu-item" data-target="voice">Voice To Text <span class="arrow">→</span></button>
+        <button class="menu-item" data-target="help">Help <span class="arrow">→</span></button>
+    </nav>
+</aside>
+
+<style>
+    :root {
+        --primary-color: #5EEAD4; 
+        --bg-dark: #111111;
+        --transition-speed: 0.8s;
+        --menu-width: 320px;
+    }
+
+    /* Top-left toggle button - Neon Style */
+    #globalMenuToggle {
+        position: fixed;
+        top: 30px;
+        left: 30px;
+        z-index: 3000;
+        background: var(--primary-color);
+        color: #000;
+        border: none;
+        border-radius: 12px;
+        width: 55px;
+        height: 55px;
+        cursor: pointer;
+        display: none; /* Controlled by JS after intro */
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        transition: all 0.4s cubic-bezier(0.86, 0, 0.07, 1);
+    }
+
+    #globalMenuToggle.active {
+        background: #fff;
+        transform: rotate(90deg);
+        border-radius: 15px;
+    }
+
+    /* Sidebar Menu - Circular Reveal */
+    #expandableSidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: var(--menu-width);
+        height: 100vh;
+        background: var(--bg-dark);
+        color: white;
+        z-index: 2500;
+        padding: 120px 40px;
+        box-sizing: border-box;
+        /* Start hidden at the button position */
+        clip-path: circle(0% at 57px 57px);
+        transition: clip-path var(--transition-speed) cubic-bezier(0.86, 0, 0.07, 1);
+        visibility: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    #expandableSidebar.open {
+        visibility: visible;
+        clip-path: circle(150% at 57px 57px);
+    }
+
+    /* Menu items */
+    .menu-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .menu-item {
+        background: none;
+        border: none;
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 1.2rem;
+        font-weight: 600;
+        text-align: left;
+        padding: 15px 0;
+        cursor: pointer;
+        position: relative;
+        opacity: 0;
+        transform: translateY(30px);
+        transition: transform 0.6s ease, opacity 0.6s ease, color 0.3s ease, padding 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+    }
+
+    #expandableSidebar.open .menu-item {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    /* Staggered Entrance */
+    .menu-item:nth-child(1) { transition-delay: 0.1s; }
+    .menu-item:nth-child(2) { transition-delay: 0.2s; }
+    .menu-item:nth-child(3) { transition-delay: 0.3s; }
+    .menu-item:nth-child(4) { transition-delay: 0.4s; }
+    .menu-item:nth-child(5) { transition-delay: 0.5s; }
+    .menu-item:nth-child(6) { transition-delay: 0.6s; }
+    .menu-item:nth-child(7) { transition-delay: 0.7s; }
+
+    .menu-item::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 0%;
+        height: 1px;
+        background: var(--primary-color);
+        transition: width 0.4s ease;
+    }
+
+    .menu-item .arrow {
+        opacity: 0;
+        transform: translateX(-20px);
+        transition: all 0.3s ease;
+        color: var(--primary-color);
+    }
+
+    .menu-item:hover, .menu-item.active {
+        color: var(--primary-color);
+        padding-left: 10px;
+    }
+
+    .menu-item:hover::after, .menu-item.active::after {
+        width: 100%;
+    }
+
+    .menu-item:hover .arrow, .menu-item.active .arrow {
+        opacity: 1;
+        transform: translateX(0);
+    }
+
+    /* Overlay */
+    #menuOverlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(8px);
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.5s ease;
+        z-index: 2400;
+    }
+
+    #menuOverlay.show {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    @media (max-width: 480px) {
+        #expandableSidebar { width: 100%; }
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const menuToggle = document.getElementById('globalMenuToggle');
+    const sidebar = document.getElementById('expandableSidebar');
+    const overlay = document.getElementById('menuOverlay');
+    const menuIcon = document.getElementById('menuIcon');
+    const menuButtons = document.querySelectorAll('.menu-item');
+
+    function toggleMenu() {
+        const isOpen = sidebar.classList.toggle('open');
+        overlay.classList.toggle('show');
+        menuToggle.classList.toggle('active');
+
+        // Swap between Hamburger and Close icon
+        if (isOpen) {
+            menuIcon.innerHTML = `<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>`;
+        } else {
+            menuIcon.innerHTML = `<line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line>`;
+        }
+    }
+
+    menuToggle.addEventListener('click', toggleMenu);
+    overlay.addEventListener('click', toggleMenu);
+
+    menuButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const targetId = btn.getAttribute('data-target');
+            
+            menuButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            // Visibility logic for your main sections
+            document.querySelectorAll('.section').forEach(sec => {
+                sec.classList.add('hidden');
+                sec.classList.remove('active');
+            });
+            
+            const targetSection = document.getElementById(targetId);
+            if (targetSection) {
+                targetSection.classList.remove('hidden');
+                targetSection.classList.add('active');
+            }
+
+            toggleMenu();
+        });
+    });
+
+    // Intro Video Logic
+    const introVideo = document.getElementById('introVideo');
+    const splash = document.getElementById('splashScreen');
+    
+    if(introVideo) {
+        introVideo.onended = function() {
+            if(splash) splash.classList.add('hidden');
+            menuToggle.style.display = 'flex'; 
+        };
+    } else {
+        // Fallback if video is missing
+        menuToggle.style.display = 'flex';
+    }
+});
+</script>
+        
+
+    <!-- Main area: keep your original app layout and sections (slightly adjusted to fit the sidebar) -->
+    <main class="main" id="app">
+
+
+      <!-- ===========================
+           Inserted original content sections (keeps your code exactly)
+           =========================== -->
+
+      <!-- HOME -->
+      <section id="home" class="section active">
+        <div class="relative overflow-hidden">
+          <div class="dot" style="top:10%; left:12%; animation-delay:0s;"></div>
+          <div class="dot" style="top:22%; right:18%; animation-delay:.6s;"></div>
+          <div class="dot" style="bottom:18%; left:22%; animation-delay:1.1s;"></div>
+          <div class="dot" style="bottom:12%; right:12%; animation-delay:1.7s;"></div>
+          <div class="max-w-7xl mx-auto px-6 lg:px-8 py-16 lg:py-24">
+            <div class="grid lg:grid-cols-2 gap-10 items-center">
+              <div>
+                <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-600/20 text-brand-200 text-xs font-semibold ring-1 ring-brand-600/30">
+                  <span class="w-1.5 h-1.5 rounded-full bg-brand-300 animate-pulse"></span>
+                  Live Preview — Demo
+                </span>
+                <h1 class="mt-4 text-4xl sm:text-5xl font-extrabold leading-tight tracking-tight">
+                  Communication, simplified—<span class="text-brand-300">for everyone</span>.
+                </h1>
+                <p class="mt-4 text-white/100 text-lg max-w-xl">
+                  Explore sign recognition and voice-to-text tools in a friendly, accessible space.
+                </p>
+                <div class="mt-6 flex flex-wrap gap-3">
+                
+                </div>
+              </div>
+
+          
+  <script>
+    // quick team card -> modal
+    (function(){
+      const modal = document.getElementById('teamModal');
+      const modalImg = document.getElementById('teamModalImg');
+      const modalName = document.getElementById('teamModalName');
+      const modalRole = document.getElementById('teamModalRole');
+  
+      document.getElementById('teamGrid')?.addEventListener('click', (e)=>{
+        const card = e.target.closest('.team-card');
+        if (!card) return;
+        const img = card.querySelector('img')?.src || card.dataset.img;
+        const name = card.querySelector('.team-name')?.textContent || '';
+        const role = card.querySelector('.team-role')?.textContent || '';
+        if (img) { modalImg.src = img; modalName.textContent = name; modalRole.textContent = role; modal.classList.add('open'); modal.setAttribute('aria-hidden','false'); }
+      });
+  
+      // keyboard & close
+      document.getElementById('closeTeamModal')?.addEventListener('click', ()=>{ modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); });
+      modal.addEventListener('click', (e)=>{ if (e.target === modal) { modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); } });
+      document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') { modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); } });
+    })();
+  </script>
+  
+
+  <div class="video-box">
+    <video autoplay muted loop playsinline>
+      <source src="pictures/2.mp4" type="video/mp4">
+      Your browser does not support the video tag.
+    </video>
+  </div>
+  
+  <style>
+  .video-box {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 30px;
+  }
+  
+  .video-box video {
+    width: 500px;         /* 👈 video width (adjust as you like) */
+    height: 240px;        /* 👈 video height (for horizontal look) */
+    border-radius: 25px;  /* rounded corners */
+    object-fit: cover;    /* crops to fit the shape cleanly */
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  
+  .video-box video:hover {
+    transform: scale(1.03);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+  }
+  
+  /* Responsive for mobile screens */
+  @media (max-width: 768px) {
+    .video-box video {
+      width: 90%;
+      height: auto;
+    }
+  }
+  </style>
+  
+
+  
+
+            </div>
+          </div>
+        </div>
+        <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <button class="home-nav-btn" data-target="about">
+            <img src="pictures/abutus.gif" class="w-14 h-14">
+            <span>About Us</span>
+          </button>
+          <button class="home-nav-btn" data-target="sign">
+            <img src="pictures/abc.gif" class="w-14 h-14">
+            <span>Hand Alphabet</span>
+          </button>
+          <button class="home-nav-btn" data-target="handnumber">
+            <img src="pictures/handnum.gif" class="w-14 h-14">
+            <span>Hand Number</span>
+          </button>
+          <button class="home-nav-btn" data-target="text2sign">
+            <img src="pictures/tts.gif" class="w-14 h-14">
+            <span>Chat To Sign</span>
+          </button>
+          <button class="home-nav-btn" data-target="voice">
+            <img src="pictures/v.gif" class="w-14 h-14">
+            <span>Voice To Text</span>
+          </button>
+          <button class="home-nav-btn" data-target="help">
+            <img src="pictures/help.gif" class="w-14 h-14">
+            <span>Help</span>
+          </button>
+        
+        <style>
+          .home-nav-btn {
+            display: flex;
+            flex-direction: row; /* Aligns items horizontally */
+            align-items: center; /* Centers items vertically */
+            gap: 20px;           /* Space between icon and text */
+            padding: 12px 20px;
+            background: rgba(255, 255, 255, 0.07);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(11, 212, 191, 0.2);
+            border-radius: 18px;
+            color: #ffffff;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            text-align: left;    /* Ensures text stays left-aligned */
+            width: 100%;         /* Makes buttons fill their grid cell */
+          }
+          
+          .home-nav-btn:hover {
+            background: rgba(11, 212, 191, 0.15);
+            border-color: #0bd4bf;
+            transform: translateX(8px); /* Slides slightly to the right on hover */
+            box-shadow: -5px 5px 20px rgba(0, 0, 0, 0.3);
+          }
+          
+          .home-nav-btn img {
+            object-fit: contain;
+            flex-shrink: 0; /* Prevents the image from getting squashed */
+            filter: drop-shadow(0 0 8px rgba(11, 212, 191, 0.4));
+            transition: transform 0.3s ease;
+          }
+          
+          .home-nav-btn:hover img {
+            transform: scale(1.2) rotate(-5deg); /* Large icon grows and tilts on hover */
+          }
+          
+          .home-nav-btn span {
+            flex-grow: 1;
+          }
+          </style>
+
+          <script>
+
+document.addEventListener('DOMContentLoaded', () => {
+  // 1. Select all the grid buttons on the home page
+  const homeButtons = document.querySelectorAll('.home-nav-btn');
+
+  homeButtons.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      // 2. Get the target (e.g., "about", "sign", etc.)
+      const target = btn.getAttribute('data-target');
+      
+      // 3. Find the corresponding sidebar button using '.menu-item'
+      const sidebarBtn = document.querySelector(`.menu-item[data-target="${target}"]`);
+      
+      if (sidebarBtn) {
+        // 4. Trigger the click event on the sidebar button
+        sidebarBtn.click();
+      } else {
+        console.warn(`Navigation failed: No sidebar item found with data-target="${target}"`);
+      }
+    });
+  });
+});
+          </script>
+        </div>
+
+        
+
+<section class="staggered-container">
+  
+</section>
+      </section>
+
+<!-- ABOUT US -->
+
+       
+<section id="about" class="section hidden team-section" aria-labelledby="about-title">
+
+
+  <div class="image-box">
+    <img src="pictures/1.jpg" alt="Wide Image" onclick="openFull(this.src)" style="cursor: pointer;">
+  </div>
+  
+  <style>
+    .image-box {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 30px;
+    }
+    .image-box img {
+      width: 800px;
+      height: 480px;
+      object-fit: cover;
+      border-radius: 25px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .image-box img:hover {
+      transform: scale(1.03);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+    }
+    @media (max-width: 768px) {
+      .image-box img { width: 90%; height: auto; }
+    }
+  </style>
+  
+  <div class="image-container">
+    <div class="image-row">
+      <img src="pictures/11.png" alt="Image 11" onclick="openFull(this.src)" style="cursor: pointer;">
+      <img src="pictures/12.png" alt="Image 12" onclick="openFull(this.src)" style="cursor: pointer;">
+      <img src="pictures/13.png" alt="Image 13" onclick="openFull(this.src)" style="cursor: pointer;">
+    </div>
+  
+    <div class="image-row">
+      <img src="pictures/14.png" alt="Image 14" onclick="openFull(this.src)" style="cursor: pointer;">
+      <img src="pictures/15.png" alt="Image 15" onclick="openFull(this.src)" style="cursor: pointer;">
+      <img src="pictures/16.png" alt="Image 16" onclick="openFull(this.src)" style="cursor: pointer;">
+    </div>
+  </div>
+  
+  <style>
+    .image-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 40px;
+      padding: 20px;
+    }
+    .image-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 30px;
+    }
+    .image-row img {
+      width: 280px;
+      height: 480px;
+      object-fit: cover;
+      border-radius: 25px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .image-row img:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 15px rgba(0,0,0,0.4);
+    }
+    @media (max-width: 768px) {
+      .image-row img { width: 140px; height: 220px; }
+    }
+    @media (max-width: 480px) {
+      .image-row { flex-wrap: wrap; }
+      .image-row img { width: 120px; height: 180px; }
+    }
+  </style>
+  
+  <div id="imgOverlay" onclick="this.style.display='none'" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:99999; cursor:zoom-out; align-items:center; justify-content:center; flex-direction:column;">
+    <img id="imgFull" src="" style="max-width:90%; max-height:85%; border-radius:20px; box-shadow: 0 0 30px rgba(0,0,0,0.5);">
+    <p style="color:white; margin-top:15px; font-family:sans-serif; letter-spacing:1px;">Click anywhere to close</p>
+  </div>
+  
+  <script>
+    function openFull(src) {
+      const overlay = document.getElementById('imgOverlay');
+      const fullImg = document.getElementById('imgFull');
+      fullImg.src = src; // Nilalagay yung source ng image na clinick mo
+      overlay.style.display = 'flex'; // Pinapakita yung hidden na overlay
+    }
+  </script>
+  
+<style>
+/* ABOUT SECTION */
+
+.haha{
+      align-content: center;
+
+}
+
+.about-section {
+  max-width: 1200px;
+  margin: 0 auto;
+  text-align: center;
+  color: #fff;
+  font-family: 'Poppins', sans-serif;
+  padding: 40px 20px;
+}
+
+/* Intro Paragraph */
+#Demu {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(11,212,191,0.3);
+  border-radius: 16px;
+  padding: 20px 25px;
+  margin-bottom: 40px;
+  font-size: 1rem;
+  line-height: 1.7;
+  transition: all 0.3s ease;
+}
+#Demu:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 0 20px rgba(11,212,191,0.2);
+}
+
+/* Mission, Vision, Core Values Grid */
+.mv-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 24px;
+  margin-bottom: 40px;
+  object-fit: fill;
+}
+.mv-box {
+  flex: 1 1 300px;
+  background: rgba(255,255,255,0.05);
+  border: 2px solid rgba(11,212,191,0.3);
+  border-radius: 18px;
+  padding: 24px;
+  transition: all 0.35s ease;
+  position: relative;
+  overflow: hidden;
+}
+.mv-box:hover {
+  background: rgba(11,212,191,0.08);
+  transform: translateY(-5px);
+  box-shadow: 0 0 25px rgba(11,212,191,0.2);
+}
+
+/* Core Values Cards */
+.values-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 24px;
+}
+.value-box {
+  flex: 1 1 250px;
+  background: linear-gradient(to bottom right, rgba(255,255,255,0.05), rgba(11,212,191,0.1));
+  border: 2px solid rgba(11,212,191,0.3);
+  border-radius: 18px;
+  padding: 20px;
+  transition: all 0.3s ease;
+}
+.value-box:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 25px rgba(11,212,191,0.25);
+}
+
+/* Typography */
+strong b {
+  font-size: 1.3rem;
+  color: #0bd4bf;
+  display: block;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+p {
+  color: rgba(255,255,255,0.8);
+  line-height: 1.6;
+  font-size: 0.95rem;
+}
+</style>
+
+    
+            <div>
+
+                <p>
+                  ‎ 
+                  ‎ 
+                  ‎ 
+                  ‎ 
+                </p>
+
+
+
+                  
+            <div>
+
+              <p>
+                ‎ 
+                ‎ 
+                ‎ 
+                ‎ 
+              </p>
+
+
+
+
+              
+
+            </div>
+
+     <div>
+
+      <p>
+        <h2 style="text-align: center; font-size: 30px; font-weight: 800; margin-bottom: 16px;">
+          Meet our team — passionate builders of accessible communication tools.
+        </h2>
+      </p>
+
+      <div>
+
+        <p>
+          ‎ 
+          ‎ 
+          ‎ 
+          ‎ 
+        </p>
+
+
+      <div class="team-wrapper">
+      <div class="team-grid">
+        <!-- 1 -->
+        <div class="team-card">
+          <img src="team/gasco.png" alt=" Gasco, Angel Mintt" class="avatar">
+          <h3>Gasco, Angel Mintt O.</h3>
+          <p class="role">Project Head and Creative Director </p>
+          <p class="bio">manages both design/technical/research teams, conceptualizing overall concept, flow, and execution</p>
+        </div>
+      
+        <!-- 2 -->
+        <div class="team-card">
+          <img src="team/mic.png" alt="Guillermo, Majoner Jr." class="avatar">
+          <h3>Guillermo, Majoner Jr. C.</h3>
+          <p class="role">Project Consultan</p>
+          <p class="bio">advises or suggests ideas to improve the technical or design aspects.</p>
+        </div>
+      
+        <!-- 3 -->
+        <div class="team-card">
+          <img src="team/Marce.png" alt="Juanillo, Marcelino II" class="avatar">
+          <h3>Juanillo, Marcelino II M.</h3>
+          <p class="role">ML Researcher</p>
+          <p class="bio">Works on gesture embeddings and accuracy improvements.</p>
+        </div>
+      
+        <!-- 4 -->
+        <div class="team-card">
+          <img src="team/rey.png" alt="Inojales, Reymark" class="avatar">
+          <h3>Inojales, Reymark P.</h3>
+          <p class="role">Frontend Dev & Support Developer</p>
+          <p class="bio">everything the user sees and interacts with directly in the browser or app.
+            It focuses on design, layout, and supporting the backend Developer.</p>
+        </div>
+      
+        <!-- 5 -->
+        <div class="team-card">
+          <img src="team/bal.png" alt="Balte, Ace Anghel" class="avatar">
+          <h3>Balte, Ace Anghel B.</h3>
+          <p class="role">Concept Developer</p>
+          <p class="bio">helps develop and refine the project’s ideas and features.</p>
+        </div>
+      
+        <!-- 6 -->
+        <div class="team-card">
+          <img src="team/taloz.png" alt="Taloza, Christian Mark" class="avatar">
+          <h3>Taloza, Christian Mark Y.</h3>
+          <p class="role">Team Collaborator </p>
+          <p class="bio">active contributors who assist in multiple areas</p>
+        </div>
+      
+        <!-- 7 -->
+        <div class="team-card">
+          <img src="team/eli.png" alt="Calibod, Elijah Cesar" class="avatar">
+          <h3>Calibod, Elijah Cesar S.</h3>
+          <p class="role">Team Collaborator </p>
+          <p class="bio">active contributors who assist in multiple areas</p>
+        </div>
+      
+        <!-- 8 -->
+        <div class="team-card">
+          <img src="team/rain.png" alt="Abuyan, Raidine" class="avatar">
+          <h3>Abuyan, Raidine L.</h3>
+          <p class="role">Software Developer back/frontend</p>
+          <p class="bio">Responsible for logic, database operations, and communication and responsible through functions of the website.</p>
+        </div>
+
+        <div class="team-card">
+          <img src="team/xyrus.jfif" alt="Arimbuyutan, Xyrus" class="avatar">
+          <h3>Arimbuyutan, Xyrus T.</h3>
+          <p class="role">Team Collaborator </p>
+          <p class="bio">active contributors who assist in multiple areas</p>
+        </div>
+      </div>
+      
+
+      <style>
+        /* Section Styling */
+
+
+        #our{
+
+          font-size: 1.1rem;
+          color: #000000;
+          margin-bottom: 40px;
+
+        }
+
+      .team-card {
+  background: rgba(0, 0, 0, 0.7);
+  padding: 40px 20px;
+  border-radius: 16px;
+}
+
+        .about-us {
+          text-align: center;
+          padding: 60px 20px;
+          background: #f1f4e8;
+          color: #fff;
+        }
+        
+        .about-title {
+          font-size: 2.5rem;
+          font-weight: 800;
+          margin-bottom: 10px;
+          color: #000000;
+        }
+        
+        .about-subtitle {
+          font-size: 1.1rem;
+          color: #000000;
+          margin-bottom: 40px;
+        }
+        
+        /* Grid */
+        .team-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* This centers the last item */
+  gap: 28px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+        
+        /* Card */
+        .team-card {
+          flex: 1 1 250px; /* This replicates the minmax(250px, 1fr) behavior */
+  max-width: 380px;
+          background: #f1f4e8(255,255,255,0.05);
+          border: 2px solid #f1f4e8(11,212,191,0.3);
+          border-radius: 18px;
+          padding: 24px;
+          transition: all 0.35s ease;
+          position: relative;
+          overflow: hidden;
+        }
+        
+        .team-card:hover {
+          transform: translateY(-8px);
+          border-color: #f1f4e8;
+          box-shadow: 0 0 25px #f1f4e8(11,212,191,0.4);
+        }
+        
+        /* Avatar */
+        .avatar {
+  width: 140px;   /* bigger */
+  height: 140px;  /* bigger */
+  background: linear-gradient(135deg, #0bd4bf, #1affdc);
+  border-radius: 50%;
+  margin: 0 auto 18px; /* add more spacing */
+  border: 4px solid #0bd4bf;
+  box-shadow: 0 0 14px rgba(11,212,191,0.5);
+  object-fit: cover;   /* keeps images proportional */
+  transition: transform 0.3s ease;
+}
+.team-card:hover .avatar {
+  transform: scale(1.1) rotate(6deg);
+}
+
+        
+        /* Name & Text */
+        .team-card h3 {
+          margin-top: 10px;
+          font-size: 1.2rem;
+          font-weight: 700;
+          color: #fff;
+        }
+        .team-card .role {
+          font-size: 0.9rem;
+          color: #f1f4e8;
+          margin-bottom: 8px;
+        }
+        .team-card .bio {
+          font-size: 0.85rem;
+          color: #ccc;
+          line-height: 1.4;
+        }
+        </style>
+
+    </section>
+  
+
+   
+    <section id="sign" class="section">
+      <div class="container" style="max-width:1300px; margin:0 auto; padding:1rem;">
+    
+        <h1 style="text-align: center; font-size: 28px; font-weight: 800; margin-bottom: 20px; color: #f1f5f9;">
+          Sign Language Detection
+        </h1>
+    
+        <div class="main-layout-wrapper">
+          
+          <div class="center-column">
+            
+            <div class="video-border-wrapper">
+              <video id="sign_video" playsinline></video>
+              <canvas id="sign_canvas" width="640" height="480"></canvas>
+              
+              <div id="sign_leftLetter" class="overlay-text overlay-top-left">—</div>
+              <div id="sign_rightSign" class="overlay-text overlay-top-right">—</div>
+              <div id="sign_countdown" class="overlay-countdown overlay-bottom-left">5s</div>
+            </div>
+    
+            <div class="settings-bar">
+              <div class="toggle-group">
+                <label style="font-weight: bold;"><input type="checkbox" id="sign_showLm" checked /> Landmarks</label>
+                <label style="font-weight: bold;"><input type="checkbox" id="sign_mirror" checked /> Mirror</label>
+              </div>
+              <div class="power-group">
+                <button id="sign_camToggle" class="btn-cam-on" style="font-weight: bold;">Turn Camera On</button>
+              </div>
+            </div>
+            
+            <textarea id="sign_sentence" rows="3" placeholder="Your sentence will appear here..." style="font-weight: bold;"></textarea>
+            
+            <div class="action-grid">
+              <button id="sign_btnAddLetter" class="btn-green" style="font-weight: bold;">Add Letter</button>
+              <button id="sign_btnSpace" class="btn-slate" style="font-weight: bold;">Space</button>
+              <button id="sign_btnBack" class="btn-orange" style="font-weight: bold;">Backspace</button>
+              <button id="sign_btnClearSentence" class="btn-red" style="font-weight: bold;">Clear</button>
+              
+              <button id="sign_btnAutoOn" class="btn-auto-on" style="font-weight: bold;">Turn ON Auto-Add</button>
+              <button id="sign_btnAutoOff" class="btn-auto-off" style="font-weight: bold;">Turn OFF Auto-Add</button>
+            </div>
+            
+          </div>
+    
+          <div class="reference-sidebar">
+            <div class="ref-box">
+              <p>Alphabet</p>
+              <img src="pictures/asll.jpg" onclick="openPopup(this.src)">
+            </div>
+            <div class="ref-box">
+              <p>Basic Signs</p>
+              <img src="pictures/basicc.jpg" onclick="openPopup(this.src)">
+            </div>
+          </div>
+    
+        </div>
+      </div>
+    </section>
+    
+    <style>
+      /* CORE LAYOUT */
+      .main-layout-wrapper {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        align-items: flex-start;
+      }
+    
+      .center-column {
+        width: 640px; /* Fixed width to prevent shifting */
+        max-width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+    
+      /* VIDEO */
+      .video-border-wrapper {
+        border: 4px solid #5EEAD4;
+        border-radius: 12px;
+        position: relative;
+        width: 100%;
+        aspect-ratio: 4/3;
+        background: #000;
+        overflow: hidden;
+      }
+      #sign_video, #sign_canvas { width: 100%; height: 100%; object-fit: cover; position: absolute; }
+    
+      /* SETTINGS BAR */
+      .settings-bar {
+        display: flex;
+        justify-content: space-between;
+        background: #1e293b;
+        padding: 8px 15px;
+        border-radius: 8px;
+        color: white;
+        font-size: 0.9rem;
+      }
+      .toggle-group, .power-group { display: flex; gap: 12px; align-items: center; }
+    
+      /* TEXT AREA */
+      #sign_sentence {
+        width: 100%;
+        background: #0f172a;
+        color: #f1f5f9;
+        border: 1px solid #334155;
+        border-radius: 8px;
+        padding: 10px;
+        resize: none;
+        box-sizing: border-box;
+      }
+    
+      /* STABLE ACTION GRID */
+      .action-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr); /* 4 Equal columns */
+        gap: 8px;
+      }
+    
+      /* Make Auto buttons span 2 columns each so they stay aligned */
+      .btn-auto-on { grid-column: span 2; background: #059669; color: white; }
+      .btn-auto-off { grid-column: span 2; background: #dc2626; color: white; }
+    
+      .action-grid button {
+        padding: 12px 5px;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 0.85rem;
+        white-space: nowrap; /* Prevents text from wrapping inside button */
+      }
+    
+      /* SIDEBAR */
+      .reference-sidebar {
+        width: 280px;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+      }
+      .ref-box { background: #1e293b; padding: 10px; border-radius: 10px; text-align: center; color: #cbd5e1; }
+      .ref-box img { width: 100%; border-radius: 5px; margin-top: 5px; cursor: pointer; }
+    
+      /* BUTTON COLORS */
+      .btn-green { background: #10b981; color: white; }
+      .btn-slate { background: #475569; color: white; }
+      .btn-orange { background: #f59e0b; color: white; }
+      .btn-red { background: #ef4444; color: white; }
+     /* Update these in your <style> area */
+.btn-cam-on { background: #22c55e; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; transition: 0.3s; }
+.btn-cam-off { background: #ef4444; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; transition: 0.3s; }
+
+
+      /* OVERLAYS */
+      .overlay-text { position: absolute; font-size: 3rem; font-weight: bold; z-index: 10; text-shadow: 2px 2px 4px #000; }
+      .overlay-top-left { top: 10px; left: 15px; color: #22c55e; }
+      .overlay-top-right { top: 10px; right: 15px; color: #3b82f6; }
+      .overlay-countdown { position: absolute; bottom: 15px; left: 15px; color: #fbbf24; font-size: 3rem; font-weight: 800; }
+    
+      /* MOBILE RESPONSIVE - STACKING BUT KEEPING GRID */
+      /* --- UPDATED RESPONSIVE SECTION --- */
+
+/* Standard Mobile/Tablet (Stacking sidebar) */
+@media (max-width: 950px) {
+  .main-layout-wrapper { flex-direction: column; align-items: center; }
+  .reference-sidebar { width: 100%; flex-direction: row; }
+  .ref-box { flex: 1; }
+}
+
+/* Specific fix for Z Fold / Ultra-narrow phones (< 400px) */
+@media (max-width: 400px) {
+  /* 1. Adjust the Settings Bar (Landmarks/Mirror/Cam) */
+  .settings-bar {
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+    text-align: center;
+  }
+
+  /* 2. Fix the Action Grid - Switch to 2 columns instead of 4 */
+  .action-grid {
+    grid-template-columns: repeat(2, 1fr); 
+    gap: 6px;
+  }
+
+  /* Reset the spans so buttons don't break the 2-column flow */
+  .action-grid button {
+    grid-column: span 1 !important; 
+    font-size: 0.75rem; /* Smaller text for narrow screens */
+    padding: 10px 2px;
+    white-space: normal; /* Allow text to wrap if it's still too long */
+    line-height: 1.1;
+  }
+
+  /* Make the Auto-Add buttons full width at the bottom of the grid */
+  .btn-auto-on, .btn-auto-off {
+    grid-column: span 2 !important;
+  }
+  
+  /* 3. Scale down the large overlay text so it doesn't block the view */
+  .overlay-text, .overlay-countdown {
+    font-size: 1.8rem;
+  }
+
+  h1 {
+    font-size: 20px !important;
+  }
+}
+    </style>
+
+
+    <script>
+   // Get references to buttons and the overlay countdown
+const btnAutoOn = document.getElementById("sign_btnAutoOn");
+const btnAutoOff = document.getElementById("sign_btnAutoOff");
+const overlayCountdown = document.getElementById("sign_countdown");
+
+// Initially hide the overlay countdown
+overlayCountdown.style.display = "none";
+
+// When Auto-Add is turned ON
+btnAutoOn.addEventListener("click", () => {
+  overlayCountdown.style.display = "block"; // Show inside the camera border
+  // Logic to start your timer would go here
+});
+
+// When Auto-Add is turned OFF
+btnAutoOff.addEventListener("click", () => {
+  overlayCountdown.style.display = "none";  // Hide from the camera border
+});
+      function openPopup(src) {
+        document.getElementById('popupImg').src = src;
+        document.getElementById('imagePopup').style.display = 'flex';
+      }
+    
+      function closePopup() {
+        document.getElementById('imagePopup').style.display = 'none';
+      }
+    
+      // Close popup if clicking outside the image
+      window.onclick = function(event) {
+        let popup = document.getElementById('imagePopup');
+        if (event.target == popup) {
+          closePopup();
+        }
+      }
+
+      
+    </script>
+    
+    </section>
+
+  <!-- SCRIPT WITH ML PREDICTION -->
+  <script>
+ 
+
+ document.addEventListener("DOMContentLoaded", function () {
+  const video = document.getElementById("sign_video");
+  const canvas = document.getElementById("sign_canvas");
+  const ctx = canvas.getContext("2d");
+
+  const showLm = document.getElementById("sign_showLm");
+  const mirror = document.getElementById("sign_mirror");
+  
+  // NEW: Toggle Button Reference
+  const camToggle = document.getElementById("sign_camToggle");
+  let isCamRunning = false;
+
+  const leftLetter = document.getElementById("sign_leftLetter");
+  const rightSign = document.getElementById("sign_rightSign");
+
+  const btnAddLetter = document.getElementById("sign_btnAddLetter");
+  const btnSpace = document.getElementById("sign_btnSpace");
+  const btnBack = document.getElementById("sign_btnBack");
+  const btnClearSentence = document.getElementById("sign_btnClearSentence");
+  const sentenceArea = document.getElementById("sign_sentence");
+
+  /* ===== Load datasets from localStorage ===== */
+  let datasetLeft = JSON.parse(localStorage.getItem("alphabet_dataset") || "{}");
+  let datasetRight = JSON.parse(localStorage.getItem("basic_dataset") || "{}");
+
+  function centroid(list) { const c = new Array(list[0].length).fill(0); list.forEach(v => v.forEach((x, i) => c[i] += x)); return c.map(x => x / list.length); }
+  function dot(a, b) { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; }
+  function norm(a) { return Math.sqrt(dot(a, a)); }
+  function cosine(a, b) { return dot(a, b) / ((norm(a) * norm(b)) || 1e-6); }
+  
+  function predict(feat, dataset) {
+    let best = { label: "__", conf: -1 };
+    for (const L in dataset) {
+      const c = centroid(dataset[L]);
+      let sim = cosine(feat, c);
+      if (sim > best.conf) best = { label: L, conf: sim };
+    }
+    return best.label;
+  }
+
+  /* ===== Camera + MediaPipe Hands ===== */
+  const hands = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+  hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.75, minTrackingConfidence: 0.75, selfieMode: true });
+  hands.onResults(onResults);
+
+  const cam = new Camera(video, { onFrame: async () => await hands.send({ image: video }), width: 640, height: 480 });
+
+  // MERGED ON/OFF BUTTON LOGIC
+  camToggle.onclick = async () => {
+    if (!isCamRunning) {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
+      await video.play();
+      cam.start();
+      isCamRunning = true;
+      camToggle.textContent = "Turn Camera Off";
+      camToggle.style.backgroundColor = "#ef4444"; // Red
+    } else {
+      try { cam.stop(); } catch { };
+      const s = video.srcObject;
+      if (s) s.getTracks().forEach(t => t.stop());
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      leftLetter.textContent = "__";
+      rightSign.textContent = "__";
+      isCamRunning = false;
+      camToggle.textContent = "Turn Camera On";
+      camToggle.style.backgroundColor = "#22c55e"; // Green
+    }
+  };
+
+  /* ===== Landmark Smoothing ===== */
+  let prevLmLeft = null, prevLmRight = null;
+  function smooth(lm, prev, a = 0.55) {
+    if (!prev) return lm.map(p => ({ ...p }));
+    return lm.map((p, i) => ({ x: a * prev[i].x + (1 - a) * p.x, y: a * prev[i].y + (1 - a) * p.y, z: a * prev[i].z + (1 - a) * p.z }));
+  }
+
+  function extractFeatures(lm, w, h) {
+    const pts = lm.map(p => ({ x: p.x * w, y: p.y * h, z: p.z * w }));
+    const origin = pts[0];
+    const rel = pts.map(p => ({ x: p.x - origin.x, y: p.y - origin.y, z: p.z - origin.z }));
+    let maxd = 0; rel.forEach(p => maxd = Math.max(maxd, Math.hypot(p.x, p.y, p.z))); maxd = Math.max(maxd, 1);
+    return rel.map(p => [p.x / maxd, p.y / maxd, p.z / maxd]).flat();
+  }
+
+  function onResults(results) {
+    ctx.save();
+    if (mirror.checked) { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+
+    let foundLeft = false;
+    let foundRight = false;
+
+    if (results.multiHandLandmarks) {
+      results.multiHandLandmarks.forEach((lm, i) => {
+        const handLabel = results.multiHandedness[i].label;
+        if (handLabel === "Left") {
+          foundLeft = true;
+          const smoothLm = smooth(lm, prevLmLeft); prevLmLeft = smoothLm.map(p => ({ ...p }));
+          if (showLm.checked) drawHand(smoothLm, '#22c55e');
+          leftLetter.textContent = predict(extractFeatures(smoothLm, canvas.width, canvas.height), datasetLeft);
+        }
+        if (handLabel === "Right") {
+          foundRight = true;
+          const smoothLm = smooth(lm, prevLmRight); prevLmRight = smoothLm.map(p => ({ ...p }));
+          if (showLm.checked) drawHand(smoothLm, '#3b82f6');
+          rightSign.textContent = predict(extractFeatures(smoothLm, canvas.width, canvas.height), datasetRight);
+        }
+      });
+    }
+
+    // RESET TO "__" IF HANDS DISAPPEAR
+    if (!foundLeft) { leftLetter.textContent = "__"; prevLmLeft = null; }
+    if (!foundRight) { rightSign.textContent = "__"; prevLmRight = null; }
+
+    ctx.restore();
+  }
+
+  function drawHand(lm, color) {
+    if (window.HAND_CONNECTIONS) drawConnectors(ctx, lm, window.HAND_CONNECTIONS, { color: color, lineWidth: 3 });
+    lm.forEach(p => { ctx.beginPath(); ctx.arc(p.x * canvas.width, p.y * canvas.height, 5, 0, 2 * Math.PI); ctx.fillStyle = color; ctx.fill(); });
+  }
+
+  /* ===== Sentence Builder Buttons ===== */
+  btnAddLetter.onclick = () => { if (leftLetter.textContent !== "__") sentenceArea.value += leftLetter.textContent; };
+  btnSpace.onclick = () => sentenceArea.value += " ";
+  btnBack.onclick = () => sentenceArea.value = sentenceArea.value.slice(0, -1);
+  btnClearSentence.onclick = () => sentenceArea.value = "";
+
+  /* ===== AUTO-ADD LOGIC (KEEPING YOURS) ===== */
+  let autoAddInterval = null;
+  let countdownTimer = null;
+  let countdownValue = 5;
+  const autoOn = document.getElementById("sign_btnAutoOn");
+  const autoOff = document.getElementById("sign_btnAutoOff");
+  const countdownDisplay = document.getElementById("sign_countdown");
+
+  function startCountdown() {
+    countdownValue = 5;
+    countdownDisplay.textContent = countdownValue + "s";
+    if (countdownTimer) clearInterval(countdownTimer);
+    countdownTimer = setInterval(() => {
+      countdownValue--;
+      countdownDisplay.textContent = countdownValue + "s";
+      if (countdownValue <= 0) countdownValue = 5;
+    }, 1000);
+  }
+
+  autoOn.onclick = () => {
+    if (autoAddInterval) return;
+    startCountdown();
+    autoAddInterval = setInterval(() => {
+      let realLetter = leftLetter.textContent.trim();
+      if (realLetter && realLetter !== "__" && realLetter.length === 1) {
+        sentenceArea.value += realLetter;
+      }
+      countdownValue = 5;
+      countdownDisplay.textContent = countdownValue + "s";
+    }, 5000);
+    autoOn.style.opacity = "0.6";
+  };
+
+  autoOff.onclick = () => {
+    if (autoAddInterval) { clearInterval(autoAddInterval); autoAddInterval = null; }
+    if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+    countdownDisplay.textContent = "5s";
+    autoOn.style.opacity = "1";
+  };
+});
+
+  </script>
+</section>
+
+
+<section id="handnumber" class="section hidden">
+  <div class="max-w-7xl mx-auto p-4">
+    <header class="flex items-center justify-between mb-4">
+      <h1 class="text-2xl md:text-3xl font-bold">Hand Number Detection</h1>
+    </header>
+
+    <section class="grid md:grid-cols-2 gap-6 items-start">
+      
+      <div class="flex flex-col gap-4">
+        <div class="bg-slate-900/60 rounded-2xl p-3 shadow-md relative">
+          <div class="relative rounded-xl overflow-hidden border-4 border-indigo-600 bg-black">
+    
+            <video id="handVideo" playsinline class="w-full h-auto block"></video>
+            
+            <canvas id="handCanvas" class="absolute inset-0 w-full h-full z-10"></canvas>
+            
+            <div id="handOverlayNumber" 
+                 style="z-index: 50;"
+                 class="absolute top-4 left-4 bg-indigo-600/90 text-white text-6xl font-black px-6 py-2 rounded-xl shadow-2xl pointer-events-none">
+              —
+            </div>
+            
+        </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 p-2 bg-slate-900/40 rounded-xl">
+          <button id="toggleCamBtn" class="px-6 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-colors">
+            Turn On Camera
+          </button>
+          
+          <label class="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 rounded-xl px-3 py-2 cursor-pointer transition-colors">
+            <input id="handChkDraw" type="checkbox" class="accent-indigo-500" checked />
+            <span class="text-sm">Landmarks</span>
+          </label>
+          
+          <label class="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 rounded-xl px-3 py-2 cursor-pointer transition-colors">
+            <input id="handChkMirror" type="checkbox" class="accent-indigo-500" checked />
+            <span class="text-sm">Mirror</span>
+          </label>
+
+          <div style="display: none;">
+            <input id="handChkPredict" type="checkbox" checked />
+            <span id="handPredLabelSmall"></span>
+            <span id="handPredConf"></span>
+            <div id="handBigNumber"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/60 rounded-2xl p-6 shadow-md border border-slate-700">
+        <h2 class="text-xl font-semibold mb-4 text-center border-b border-slate-700 pb-2">Reference Guide</h2>
+        <div class="relative group">
+          <img src="pictures/10.jpg" 
+               alt="Hand Number Reference" 
+               onclick="openPopup(this.src)" 
+               class="w-full h-auto rounded-lg shadow-lg cursor-pointer transition-all duration-300 group-hover:ring-4 group-hover:ring-indigo-500/50">
+          <div class="mt-4 text-center text-slate-400 text-sm italic">
+            Click image to enlarge view
+          </div>
+        </div>
+      </div>
+
+    </section>
+  </div>
+</section>
+
+<div id="imagePopup" onclick="closePopup()" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15, 23, 42, 0.9); z-index:99999; justify-content:center; align-items:center; padding: 20px;">
+    <div style="position:relative; background:#1e293b; padding:10px; border-radius:15px; max-width:90%;" onclick="event.stopPropagation()">
+        <span onclick="closePopup()" style="position:absolute; top:-15px; right:-15px; background:#ef4444; color:white; width:35px; height:35px; border-radius:50%; text-align:center; line-height:35px; cursor:pointer; font-weight:bold; border:2px solid white;">&times;</span>
+        <img id="popupImg" src="" style="max-width:100%; max-height:80vh; border-radius:10px;">
+    </div>
+</div>
+<script>
+  
+  function openPopup(src) {
+    document.getElementById('popupImg').src = src;
+    document.getElementById('imagePopup').style.display = 'flex';
+  }
+
+  function closePopup() {
+    document.getElementById('imagePopup').style.display = 'none';
+  }
+
+  // Isasara ang popup kapag clinick ang background (labas ng image box)
+  window.onclick = function(event) {
+    let popup = document.getElementById('imagePopup');
+    if (event.target == popup) {
+      closePopup();
+    }
+  }
+</script>
+
+
+  <!-- MediaPipe Hands -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+
+  <script>
+    const video = document.getElementById('handVideo');
+    const canvas = document.getElementById('handCanvas');
+    const ctx = canvas.getContext('2d');
+    const bigNumber = document.getElementById('handOverlayNumber');
+    const predLabelSmall = document.getElementById('handPredLabelSmall');
+    const predConf = document.getElementById('handPredConf');
+    const chkDraw = document.getElementById('handChkDraw');
+    const chkMirror = document.getElementById('handChkMirror');
+    const chkPredict = document.getElementById('handChkPredict');
+    const toggleBtn = document.getElementById('toggleCamBtn');
+
+    const DATA_KEY = 'hand_number_dataset';
+    let dataset = {};
+    try {
+      const raw = localStorage.getItem(DATA_KEY);
+      if (raw) dataset = JSON.parse(raw);
+    } catch (e) { dataset = {}; }
+
+    const hands = new Hands({locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
+    hands.setOptions({
+      maxNumHands: 1,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.6,
+      minTrackingConfidence: 0.6
+    });
+    hands.onResults(onResults);
+
+    let cam = null;
+    let stream = null;
+    let cameraOn = false;
+
+    async function startCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: 640, height: 480 },
+          audio: false
+        });
+        video.srcObject = stream;
+        await video.play();
+        cam = new Camera(video, { onFrame: async () => { await hands.send({ image: video }); }, width: 640, height: 480 });
+        cam.start();
+        cameraOn = true;
+        toggleBtn.textContent = "Turn Off Camera";
+      } catch (err) {
+        alert('Camera access is required.');
+      }
+    }
+
+    function stopCamera() {
+      if (cam) cam.stop();
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+      }
+      video.srcObject = null;
+      cameraOn = false;
+      toggleBtn.textContent = "Turn On Camera";
+
+      // Reset display
+      bigNumber.textContent = '—';
+      predLabelSmall.textContent = '—';
+      predConf.textContent = '0.00';
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    toggleBtn.addEventListener('click', () => {
+      cameraOn ? stopCamera() : startCamera();
+    });
+
+    function extractFeatures(landmarks, w, h) {
+      const pts = landmarks.map(p => ({x: p.x * w, y: p.y * h, z: (p.z || 0) * w}));
+      const origin = pts[0];
+      const rel = pts.map(p => ({x: p.x - origin.x, y: p.y - origin.y, z: p.z - origin.z}));
+      let maxDist = 1e-6;
+      for (const p of rel) {
+        const d = Math.hypot(p.x, p.y, p.z);
+        if (d > maxDist) maxDist = d;
+      }
+      const norm = rel.map(p => ({x: p.x / maxDist, y: p.y / maxDist, z: p.z / maxDist}));
+      const feat = [];
+      norm.forEach(p => feat.push(p.x, p.y, p.z));
+      return feat;
+    }
+
+    function centroid(vectors) {
+      const c = new Array(vectors[0].length).fill(0);
+      vectors.forEach(v => { for (let i = 0; i < c.length; i++) c[i] += v[i]; });
+      for (let i = 0; i < c.length; i++) c[i] /= vectors.length;
+      return c;
+    }
+    function dot(a, b) { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; }
+    function norm(a) { return Math.sqrt(dot(a, a)); }
+    function cosine(a, b) { const n = (norm(a) * norm(b)) || 1e-6; return dot(a, b) / n; }
+
+    function predict(feat) {
+      const labels = Object.keys(dataset);
+      if (!labels.length) return { label: '—', conf: 0 };
+      let best = { label: '—', conf: -Infinity };
+      for (const l of labels) {
+        const vecs = dataset[l];
+        if (!vecs.length) continue;
+        const c = centroid(vecs);
+        const sim = cosine(feat, c);
+        if (sim > best.conf) best = { label: l, conf: sim };
+      }
+      return best.conf === -Infinity ? { label: '—', conf: 0 } : best;
+    }
+
+    function onResults(results) {
+      const { image, multiHandLandmarks } = results;
+      canvas.width = image.width; canvas.height = image.height;
+      ctx.save();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (chkMirror.checked) {
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+      }
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+      if (multiHandLandmarks && multiHandLandmarks.length) {
+        const lm = multiHandLandmarks[0];
+        if (chkDraw.checked) {
+          window.drawConnectors(ctx, lm, HAND_CONNECTIONS, { color: '#4f46e5', lineWidth: 2 });
+          window.drawLandmarks(ctx, lm, { color: '#93c5fd', radius: 3 });
+        }
+
+        if (chkPredict.checked) {
+          const feat = extractFeatures(lm, canvas.width, canvas.height);
+          const out = predict(feat);
+          bigNumber.textContent = out.label;
+          predLabelSmall.textContent = out.label;
+          predConf.textContent = out.conf.toFixed(2);
+        }
+      } else {
+        bigNumber.textContent = '—';
+        predLabelSmall.textContent = '—';
+        predConf.textContent = '0.00';
+      }
+
+      ctx.restore();
+    }
+  </script>
+
+
+
+
+
+
+<!-- TEXT TO SIGN -->
+<section id="text2sign" class="section hidden">
+  <div class="max-w-4xl mx-auto px-6 py-12"
+       style="border: 3px solid #1e1e1e; border-radius: 15px; background-color: #1e1e1e; padding: 20px;">
+    
+    <h2 class="text-3xl font-extrabold mb-4" style="color: #fff;">Chat to Sign Language</h2>
+    
+    <div class="t2s-container">
+      <div class="grid gap-4">
+
+        <input id="textInput" class="t2s-input" type="text" placeholder="Type any words/numbers.." 
+               style="background-color: #000; color: #fff; border: 2px solid #444; border-radius: 8px; padding: 10px;" />
+        
+        <div class="flex gap-3">
+          <button class="px-3 py-2 rounded-xl bg-slate-700 text-white" id="convertBtn">Convert</button>
+          <button class="px-3 py-2 rounded-xl bg-slate-700 text-white" id="clearT2S">Clear</button>
+        </div>
+        
+        <div id="output" class="t2s-output" aria-live="polite" 
+             style="border: 2px solid #444; border-radius: 8px; padding: 10px; background-color:#1e1e1e; color:#fff;"></div>
+      </div>
+    </div>
+
+    <p class="text-white/60 text-sm mt-3"><code></code> <code></code> <code></code></p>
+  </div>
+
+
+<!-- Zoom modal -->
+<div id="zoomModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); justify-content:center; align-items:center; z-index:9999;">
+  <img id="zoomImg" src="" style="max-width:90%; max-height:90%; border-radius:12px; box-shadow:0 0 30px #000;">
+</div>
+
+
+<div class="max-w-4xl mx-auto px-4 py-8 md:px-6 md:py-12"
+     style="border: 3px solid #1e1e1e; border-radius: 15px; background-color: #1e1e1e; padding: 20px;">
+  
+  <div style="text-align: center;">
+    <h2 style="font-size: clamp(24px, 5vw, 32px); font-weight: 800; margin-bottom: 20px; color: #ffffff;">Chat to Basic Sign Language</h2>
+  </div>
+
+  <div style="display: flex; flex-direction: row; flex-wrap: wrap; align-items: flex-start; justify-content: center; gap: 20px; background: #1e1e1e; padding: 20px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); border: 1px solid #333;">
+    
+    <div style="flex: 1; min-width: 280px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 20px;">
+      
+      <div id="wordInput"
+           contenteditable="true"
+           oninput="showImage()"
+           placeholder="Type a word..."
+           style="width: 100%; max-width: 400px; min-height: 40px; padding: 12px; border: 2px solid #444; border-radius: 8px; outline:none; text-align:center; font-size: 18px; background: #000000; color: #ffffff;"></div>
+
+      <div id="imageBox"
+           style="width: 100%; max-width: 500px; height: 250px; border: 2px dashed #444; border-radius: 12px; display:flex; align-items:center; justify-content:center; background: #252525; overflow: hidden;">
+        <span style="color: #777;">Image will appear here</span>
+      </div>
+
+      <div id="clearBtn" style="padding:10px 25px; background:#e0e0e0; color:#000; border-radius:8px; cursor:pointer; font-weight: bold; transition: background 0.3s; text-align: center; width: 100px;">
+        Clear
+      </div>
+    </div>
+
+    <div style="width: 100%; max-width: 200px; display: flex; flex-direction: column; border-top: 1px solid #333; padding-top: 20px; margin-top: 10px; md:border-top: none;">
+      <h3 style="margin-top: 0; font-size: 18px; color: #ffffff; border-bottom: 2px solid #444; padding-bottom: 10px;">Available Signs</h3>
+      <div style="height: 300px; overflow-y: auto; padding-right: 10px; font-size: 14px; color: #bbb;">
+        <ul style="list-style: none; padding: 0; margin: 0; line-height: 2;">
+          <li>✨ peace</li><li>✨ love</li><li>✨ me</li><li>✨ you</li><li>✨ i love you</li>
+          <li>✨ hi</li><li>✨ okay</li><li>✨ voice</li><li>✨ thank you</li><li>✨ deaf</li>
+          <li>✨ good</li><li>✨ sorry</li><li>✨ wait</li><li>✨ pretty</li><li>✨ eat</li>
+          <li>✨ yes</li><li>✨ no</li><li>✨ di</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Zoom Modal -->
+<div id="zoomModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); justify-content:center; align-items:center; z-index:9999;">
+  <img id="zoomImg" src="" style="max-width:90%; max-height:90%; border-radius:12px; box-shadow:0 0 30px #000; transition: transform 0.3s ease;">
+</div>
+
+<script>
+  const wordImages = {
+    "peace": "basic/1.png",
+    "love": "basic/2.png",
+    "me": "basic/3.png",
+    "you": "basic/4.png",
+    "i love you": "basic/5.png",
+    "hi": "basic/6.png",
+    "okay": "basic/7.png",
+    "voice": "basic/8.png",
+    "thank you": "basic/9.png",
+    "deaf": "basic/10.png",
+    "good": "basic/11.png",
+    "sorry": "basic/12.png",
+    "wait": "basic/13.png",
+    "pretty": "basic/14.png",
+    "eat": "basic/15.png",
+    "yes": "basic/16.png",
+    "no": "basic/17.png",
+    "domain": "basic/domain.jfif"
+  };
+
+  function showImage() {
+    const input = document.getElementById("wordInput").innerText.toLowerCase().trim();
+    const imageBox = document.getElementById("imageBox");
+
+    if (!input) {
+      imageBox.innerHTML = "<span style='color: #999;'>Image will appear here</span>";
+      return;
+    }
+
+    if (wordImages[input]) {
+      imageBox.innerHTML = `<img src="${wordImages[input]}" style="max-width:100%; max-height:100%; object-fit: contain; cursor: zoom-in;">`;
+
+      // Add click to zoom
+      const img = imageBox.querySelector("img");
+      img.addEventListener("click", () => {
+        const modal = document.getElementById("zoomModal");
+        const zoomImg = document.getElementById("zoomImg");
+        zoomImg.src = img.src;
+        modal.style.display = "flex";
+      });
+
+    } else {
+      imageBox.innerHTML = "<span style='color: #999;'>No image found</span>";
+    }
+  }
+
+  // Clear button
+  document.getElementById("clearBtn").onclick = function() {
+    document.getElementById("wordInput").innerText = "";
+    document.getElementById("imageBox").innerHTML = "<span style='color: #999;'>Image will appear here</span>";
+  };
+
+  // Close zoom modal when clicked
+  document.getElementById("zoomModal").addEventListener("click", () => {
+    document.getElementById("zoomModal").style.display = "none";
+  });
+</script>
+
+      </section>
+
+      <!-- VOICE -->
+      <section id="voice" class="section hidden">
+        <div class="max-w-7xl mx-auto px-6 lg:px-8 py-12 lg:py-16">
+          <div class="flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <h2 class="text-3xl font-extrabold tracking-tight">Voice to Text</h2>
+              <p class="text-white/70 mt-2">Press start to dictate. </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="btnStartVoice" class="px-4 py-2 rounded-lg bg-brand-600 text-white font-semibold">Start</button>
+              <button id="btnStopVoice" class="px-4 py-2 rounded-lg bg-white/10 text-white/80">Stop</button>
+            </div>
+          </div>
+          <div class="mt-8 rounded-2xl bg-white/5 ring-1 ring-white/10 p-4">
+            <div class="grid md:grid-cols-3 gap-3 items-center">
+             
+            </div>
+            <textarea id="voiceTextarea" rows="6" class="w-full rounded-xl bg-slate-950 p-3 resize-y text-white mt-4" placeholder="Transcription will appear here..."></textarea>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <button id="btnAddVoiceToSentence" class="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500">Add to Sentence</button>
+              <button id="btnClearSentenceVoice" class="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500">Clear Sentences</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- HELP and SETTINGS sections (kept intact) -->
+      <section id="help" class="section hidden">
+        <div class="max-w-4xl mx-auto px-6 py-12">
+          <h2 class="text-3xl font-extrabold mb-4">Help & Tutorial</h2>
+          <div id="zoomOverlay" onclick="closeZoom()" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:10000; cursor:zoom-out; justify-content:center; align-items:center; padding:20px;">
+            <img id="zoomedImg" src="" style="max-width:95%; max-height:95%; border-radius:10px; box-shadow:0 0 20px rgba(0,0,0,0.5); object-fit:contain;">
+          </div>
+          
+          <div style="display: flex; flex-direction: column; align-items: center; padding: 20px; gap: 25px;">
+            
+            <img src="pictures/q.png" onclick="openZoom(this.src)" 
+                 style="width: 100%; max-width: 900px; height: auto; cursor: zoom-in; border-radius: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); transition: transform 0.3s ease;">
+            
+            <img src="pictures/w.png" onclick="openZoom(this.src)" 
+                 style="width: 100%; max-width: 900px; height: auto; cursor: zoom-in; border-radius: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); transition: transform 0.3s ease;">
+          
+            <img src="pictures/e.png" onclick="openZoom(this.src)" 
+                 style="width: 100%; max-width: 900px; height: auto; cursor: zoom-in; border-radius: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); transition: transform 0.3s ease;">
+          
+            <img src="pictures/r.png" onclick="openZoom(this.src)" 
+                 style="width: 100%; max-width: 900px; height: auto; cursor: zoom-in; border-radius: 25px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); transition: transform 0.3s ease;">
+          
+          </div>
+          <script>
+
+
+  function openZoom(imageSrc) {
+    const overlay = document.getElementById('zoomOverlay');
+    const zoomedImg = document.getElementById('zoomedImg');
+    
+    zoomedImg.src = imageSrc;
+    overlay.style.display = 'flex';
+    // Prevent scrolling while zoomed
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeZoom() {
+    const overlay = document.getElementById('zoomOverlay');
+    overlay.style.display = 'none';
+    // Restore scrolling
+    document.body.style.overflow = 'auto';
+  }
+
+
+            // Simple hover effect for all images
+            document.querySelectorAll('img').forEach(img => {
+              img.addEventListener('mouseenter', () => {
+                img.style.transform = 'scale(1.03)';
+                img.style.boxShadow = '0 8px 20px rgba(0,0,0,0.4)';
+              });
+              img.addEventListener('mouseleave', () => {
+                img.style.transform = 'scale(1)';
+                img.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+              });
+            });
+          </script>          
+      </section>
+
+    
+
+
+      
+
+      
+
+      <footer style="margin-top:18px; color:rgba(255,255,255,.6); font-size:13px;">
+        © <span id="year"></span> Demu.
+      </footer>
+    </main>
+  </div>
+
+  <!-- === External libs (MediaPipe) === -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+
+  <!-- ===========================
+       Original app scripts (kept intact and merged)
+       =========================== -->
+  <script>
+    // Navigation: wire leftbar buttons to showSection (and highlight)
+    const menuBtns = document.querySelectorAll('.leftbar .menu-btn');
+    const sections = document.querySelectorAll('.section');
+    function showSection(targetId){
+      sections.forEach(s => { s.classList.add('hidden'); s.classList.remove('active'); });
+      const t = document.getElementById(targetId);
+      if (t) { t.classList.remove('hidden'); t.classList.add('active'); }
+      menuBtns.forEach(b => { if (b.dataset.target === targetId) b.classList.add('active'); else b.classList.remove('active'); });
+      // hide mobile menu if any (toggle)
+      const mobileMenu = document.getElementById('mobileMenu');
+      if (mobileMenu) mobileMenu.classList.add('hidden');
+      // scroll top of main for better UX
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    menuBtns.forEach(b => b.addEventListener('click', ()=> showSection(b.dataset.target)));
+    // Also support original header nav-buttons (if present)
+    document.querySelectorAll('.nav-btn').forEach(n => n.addEventListener('click', (e) => {
+      const t = e.currentTarget.dataset.target; if (t) showSection(t);
+    }));
+    // Mobile menu toggle (if present in original header)
+    const mobileToggle = document.getElementById('mobileMenuToggle');
+    if (mobileToggle) mobileToggle.addEventListener('click', ()=> {
+      // simply show home/sign toggles by toggling the help/visible (basic)
+      const next = document.getElementById('sign'); showSection(next ? 'sign' : 'home');
+    });
+    // initial
+    showSection('home');
+
+    // set year
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+
+  <script>
+
+
+
+
+
+// Add new script to handle menu collapse/expand
+const leftbar = document.querySelector('.leftbar');
+const toggleButton = document.getElementById('menu-toggle');
+const expandIcon = document.getElementById('expand-icon');
+const collapseIcon = document.getElementById('collapse-icon');
+
+toggleButton.addEventListener('click', () => {
+  const isExpanded = leftbar.classList.toggle('collapsed');
+  toggleButton.setAttribute('aria-expanded', !isExpanded);
+  if (isExpanded) {
+    expandIcon.classList.remove('hidden');
+    collapseIcon.classList.add('hidden');
+  } else {
+    expandIcon.classList.add('hidden');
+    collapseIcon.classList.remove('hidden');
+  }
+});
+
+// Make sure menu highlighting works with new structure
+function updateMenuHighlight(targetId){
+  menuBtns.forEach(b => {
+    if (b.dataset.target === targetId) {
+      b.classList.add('active');
+    } else {
+      b.classList.remove('active');
+    }
+  });
+}
+
+// Modify the existing showSection function to use the new highlight logic
+function showSection(targetId) {
+  sections.forEach(s => { s.classList.add('hidden'); s.classList.remove('active'); });
+  const t = document.getElementById(targetId);
+  if (t) { t.classList.remove('hidden'); t.classList.add('active'); }
+  updateMenuHighlight(targetId);
+  // hide mobile menu if any (toggle)
+  const mobileMenu = document.getElementById('mobileMenu');
+  if (mobileMenu) mobileMenu.classList.add('hidden');
+  // scroll top of main for better UX
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+    /* -- BEGIN: preserved original core script (camera + dataset + speech) -- */
+   // --- SMOOTHING CONFIG ---
+let smoothLandmarksBuffer = [];
+const SMOOTHING_FRAMES = 5; // number of frames to average
+let smoothPredBuffer = [];
+const PRED_SMOOTH_FRAMES = 3; // smooth prediction labels
+
+// --- UTILITY FUNCTIONS ---
+function smoothLandmarks(currentLandmarks) {
+    smoothLandmarksBuffer.push(currentLandmarks.map(p => ({ ...p })));
+    if (smoothLandmarksBuffer.length > SMOOTHING_FRAMES) smoothLandmarksBuffer.shift();
+
+    return currentLandmarks.map((p, i) => {
+        let sumX = 0, sumY = 0, sumZ = 0;
+        smoothLandmarksBuffer.forEach(frame => {
+            sumX += frame[i].x;
+            sumY += frame[i].y;
+            sumZ += frame[i].z;
+        });
+        const len = smoothLandmarksBuffer.length;
+        return { x: sumX / len, y: sumY / len, z: sumZ / len };
+    });
+}
+
+function smoothPrediction(label) {
+    smoothPredBuffer.push(label);
+    if (smoothPredBuffer.length > PRED_SMOOTH_FRAMES) smoothPredBuffer.shift();
+
+    const counts = {};
+    smoothPredBuffer.forEach(l => counts[l] = (counts[l] || 0) + 1);
+    let best = '—', max = 0;
+    for (const l in counts) {
+        if (counts[l] > max) { max = counts[l]; best = l; }
+    }
+    return best;
+}
+
+// --- HANDS AND CAMERA SETUP ---
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const chkDraw = document.getElementById('chkDraw');
+const chkMirror = document.getElementById('chkMirror');
+const chkPredict = document.getElementById('chkPredict');
+const bigLetterEl = document.getElementById('bigLetter');
+const predLabelSmall = document.getElementById('predLabelSmall');
+const predConfEl = document.querySelector('#predConf span');
+
+const hands = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+hands.onResults(onResults);
+
+const cam = new Camera(video, { onFrame: async () => await hands.send({ image: video }), width: 640, height: 480 });
+
+// --- START/STOP CAMERA ---
+let cameraActive = false;
+function startCamera() {
+    if (cameraActive) return;
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 640, height: 480 } })
+        .then(stream => { video.srcObject = stream; video.play(); cam.start(); cameraActive = true; })
+        .catch(e => alert('Camera permission required.'));
+}
+function stopCamera() {
+    if (!cameraActive) return;
+    cam.stop();
+    video.srcObject.getTracks().forEach(t => t.stop());
+    cameraActive = false;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    bigLetterEl.textContent = '—';
+    predLabelSmall.textContent = '—';
+    predConfEl.textContent = '0.00';
+}
+document.getElementById('btnStartCam').onclick = startCamera;
+document.getElementById('btnStopCam').onclick = stopCamera;
+
+// --- FEATURE EXTRACTION / PREDICTION ---
+function extractFeatures(landmarks, width, height) {
+    const pts = landmarks.map(p => ({ x: p.x * width, y: p.y * height, z: (p.z || 0) * width }));
+    const origin = pts[0];
+    const rel = pts.map(p => ({ x: p.x - origin.x, y: p.y - origin.y, z: p.z - origin.z }));
+    let maxDist = 1e-6;
+    rel.forEach(p => { const d = Math.hypot(p.x, p.y, p.z); if (d > maxDist) maxDist = d; });
+    return rel.flatMap(p => [p.x / maxDist, p.y / maxDist, p.z / maxDist]);
+}
+
+// Simple cosine similarity
+function centroid(vectors) {
+    const c = new Array(vectors[0].length).fill(0);
+    vectors.forEach(v => v.forEach((val, i) => c[i] += val));
+    return c.map(v => v / vectors.length);
+}
+function dot(a, b) { return a.reduce((s, v, i) => s + v * b[i], 0); }
+function norm(a) { return Math.sqrt(dot(a, a)); }
+function cosine(a, b) { return dot(a, b) / ((norm(a) * norm(b)) || 1e-6); }
+let dataset = {}; // Your dataset object
+function predict(feat) {
+    const labels = Object.keys(dataset);
+    if (!labels.length) return { label: '—', conf: 0 };
+    let best = { label: '—', conf: -Infinity };
+    labels.forEach(l => {
+        const vecs = dataset[l]; if (!vecs?.length) return;
+        const c = centroid(vecs);
+        const sim = cosine(feat, c);
+        if (sim > best.conf) best = { label: l, conf: sim };
+    });
+    return best.conf === -Infinity ? { label: '—', conf: 0 } : best;
+}
+
+// --- DRAWING ---
+const HAND_CONNECTIONS = window.HAND_CONNECTIONS;
+function drawLandmarksAndConnections(landmarks) {
+    if (HAND_CONNECTIONS) window.drawConnectors(ctx, landmarks, HAND_CONNECTIONS, { lineWidth: 3 });
+    window.drawLandmarks(ctx, landmarks, { radius: 3 });
+}
+
+// --- ON RESULTS ---
+function onResults(results) {
+    const { image, multiHandLandmarks } = results;
+    if (!cameraActive) return;
+    canvas.width = image.width;
+    canvas.height = image.height;
+
+    ctx.save();
+    if (chkMirror?.checked) { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+    if (multiHandLandmarks && multiHandLandmarks.length) {
+        let lm = smoothLandmarks(multiHandLandmarks[0]);
+        if (chkDraw?.checked) drawLandmarksAndConnections(lm);
+
+        const feat = extractFeatures(lm, canvas.width, canvas.height);
+        if (chkPredict?.checked) {
+            const out = predict(feat);
+            const smoothLabel = smoothPrediction(out.label);
+
+            bigLetterEl.textContent = smoothLabel;
+            predLabelSmall.textContent = smoothLabel;
+            predConfEl.textContent = out.conf.toFixed(2);
+
+            bigLetterEl.style.opacity = out.conf >= 0.85 ? '1' : out.conf > 0 ? '0.92' : '0.6';
+            bigLetterEl.style.transform = out.conf >= 0.85 ? 'scale(1.03)' : 'scale(0.98)';
+        }
+    } else {
+        bigLetterEl.textContent = '—';
+        predLabelSmall.textContent = '—';
+        predConfEl.textContent = '0.00';
+    }
+    ctx.restore();
+}
+
+
+    /* Speech recognition setup (keeps your original) */
+    let globalRecognition = null; let globalRecognizing = false; let defaultVoiceLang = localStorage.getItem('demu_default_voice_lang') || 'en-US';
+    (function initSpeechRecognition(){
+        const btnStartVoice = document.getElementById('btnStartVoice');
+        const btnStopVoice = document.getElementById('btnStopVoice');
+        const voiceTextarea = document.getElementById('voiceTextarea');
+        const btnAddVoiceToSentence = document.getElementById('btnAddVoiceToSentence');
+        const btnClearSentenceVoice = document.getElementById('btnClearSentenceVoice');
+        const voiceLangSelect = document.getElementById('voiceLangSelect');
+        const voiceLangCustom = document.getElementById('voiceLangCustom');
+        const voiceLangStatus = document.getElementById('voiceLangStatus');
+        try {
+            if (voiceLangSelect) {
+                const opts = Array.from(voiceLangSelect.options).map(o=>o.value);
+                if (opts.includes(defaultVoiceLang)) { voiceLangSelect.value = defaultVoiceLang; voiceLangCustom.classList.add('hidden'); } else { voiceLangSelect.value='custom'; voiceLangCustom.classList.remove('hidden'); voiceLangCustom.value = defaultVoiceLang; }
+            }
+            if (voiceLangStatus) voiceLangStatus.textContent = 'Current: ' + defaultVoiceLang;
+        } catch(e){}
+        if (!btnStartVoice || !btnStopVoice || !voiceTextarea) return;
+        function createRecognition(lang){ if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) return null; const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition; try { const r = new SpeechRecognition(); r.lang = lang || (defaultVoiceLang || 'en-US'); r.continuous = true; r.interimResults = true; r.onresult = (event)=>{ let combinedTranscript=''; for(let i=0;i<event.results.length;i++) combinedTranscript += event.results[i][0].transcript; voiceTextarea.value = combinedTranscript; }; r.onstart = ()=>{ globalRecognizing = true; try{ btnStartVoice.textContent = 'Listening…'; }catch(e){} }; r.onerror = (e)=>{ console.warn('Speech recognition error', e); }; r.onend = ()=>{ globalRecognizing = false; try{ btnStartVoice.textContent = 'Start'; }catch(e){} }; return r; } catch(err){ console.warn('SpeechRecognition creation failed', err); return null; } }
+        function setRecognitionLanguage(code){ if (!code) return; defaultVoiceLang = code; localStorage.setItem('demu_default_voice_lang', code); if (voiceLangStatus) voiceLangStatus.textContent = 'Current: ' + code; try { const wasListening = globalRecognizing; if (globalRecognition && globalRecognizing) { globalRecognition.onend = null; globalRecognition.stop(); } globalRecognition = createRecognition(code); if (wasListening && globalRecognition) { setTimeout(()=>{ try{ globalRecognition.start(); }catch(e){ console.warn('Restart failed', e); } }, 250); } } catch(err){ console.warn('Failed to change recognition language', err); } }
+        window.setRecognitionLanguage = setRecognitionLanguage;
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            globalRecognition = createRecognition(defaultVoiceLang);
+            if (voiceLangStatus) voiceLangStatus.textContent = 'Current: ' + (defaultVoiceLang || 'unknown');
+            btnStartVoice.addEventListener('click', ()=>{ try{ if (!globalRecognition) globalRecognition = createRecognition(defaultVoiceLang); if (globalRecognition && !globalRecognizing) { globalRecognition.start(); } } catch(e){ console.warn('Recognition start failed', e); } });
+            btnStopVoice.addEventListener('click', ()=>{ try{ if (globalRecognition && globalRecognizing) globalRecognition.stop(); } catch(e){ console.warn('Recognition stop failed', e); } });
+            btnAddVoiceToSentence && btnAddVoiceToSentence.addEventListener('click', ()=>{ const txt = (voiceTextarea.value||'').trim(); if (!txt){ alert('No transcribed text to add. Speak first or wait for transcription.'); return; } if (sentence.value && !sentence.value.endsWith(' ')) sentence.value += ' '; sentence.value += txt; });
+            btnClearSentenceVoice && btnClearSentenceVoice.addEventListener('click', clearSentences);
+            if (voiceLangSelect) { voiceLangSelect.addEventListener('change', (e)=>{ const v = e.target.value; if (v==='custom'){ voiceLangCustom.classList.remove('hidden'); voiceLangCustom.focus(); } else { voiceLangCustom.classList.add('hidden'); setRecognitionLanguage(v); } }); }
+            if (voiceLangCustom) { voiceLangCustom.addEventListener('change',(e)=>{ const code=(e.target.value||'').trim(); if (code) { setRecognitionLanguage(code); try{ voiceLangSelect.value='custom'; }catch(e){} } }); voiceLangCustom.addEventListener('keydown',(ev)=>{ if (ev.key==='Enter'){ const code=(voiceLangCustom.value||'').trim(); if (code) setRecognitionLanguage(code); } }); }
+        } else {
+            btnStartVoice.disabled = true; btnStopVoice.disabled = true; if (voiceTextarea) voiceTextarea.value = "⚠️ Speech Recognition not supported in this browser. Use Chrome or Edge.";
+        }
+    })();
+    (function initSettingsUI(){
+        const settingsLangSelect = document.getElementById('settingsLangSelect');
+        const settingsLangCustom = document.getElementById('settingsLangCustom');
+        const btnSaveLang = document.getElementById('btnSaveLang');
+        const storedLang = localStorage.getItem('demu_default_voice_lang') || defaultVoiceLang || 'en-US';
+        if (settingsLangSelect){ const opts = Array.from(settingsLangSelect.options).map(o=>o.value); if (opts.includes(storedLang)) { settingsLangSelect.value = storedLang; if (settingsLangCustom) settingsLangCustom.classList.add('hidden'); } else { settingsLangSelect.value = 'custom'; if (settingsLangCustom){ settingsLangCustom.classList.remove('hidden'); settingsLangCustom.value = storedLang; } } }
+        if (settingsLangSelect) { settingsLangSelect.addEventListener('change',(e)=>{ if (e.target.value === 'custom'){ if (settingsLangCustom) settingsLangCustom.classList.remove('hidden'); if (settingsLangCustom) settingsLangCustom.focus(); } else { if (settingsLangCustom) settingsLangCustom.classList.add('hidden'); } }); }
+        if (settingsLangCustom) { settingsLangCustom.addEventListener('keydown',(ev)=>{ if (ev.key === 'Enter'){ btnSaveLang?.click(); } }); }
+        if (btnSaveLang) { btnSaveLang.addEventListener('click', ()=>{ let code = settingsLangSelect.value; if (code === 'custom' && settingsLangCustom) { code = (settingsLangCustom.value||'').trim(); if (!code) { alert('Please enter a BCP-47 language code (e.g. en-AU)'); return; } } localStorage.setItem('demu_default_voice_lang', code); try { const voiceLangSelect = document.getElementById('voiceLangSelect'); const voiceLangCustom = document.getElementById('voiceLangCustom'); if (voiceLangSelect){ const opts = Array.from(voiceLangSelect.options).map(o=>o.value); if (opts.includes(code)) { voiceLangSelect.value = code; if (voiceLangCustom) voiceLangCustom.classList.add('hidden'); } else { voiceLangSelect.value = 'custom'; if (voiceLangCustom){ voiceLangCustom.classList.remove('hidden'); voiceLangCustom.value = code; } } } if (window.setRecognitionLanguage) window.setRecognitionLanguage(code); alert('Default recognition language saved: ' + code); } catch(e){ console.warn('Failed to save/apply language', e); } }); }
+    })();
+    /* -- END preserved core script -- */
+  </script>
+
+
+
+  <!-- Text→Sign images mapping & handlers (kept original) -->
+  <script>
+    const aslImages = {
+    "A": "a-z/a.jfif","B":"a-z/b.jfif","C":"a-z/c.jfif","D":"a-z/d.jfif","E":"a-z/e.jfif",
+    "F":"a-z/f.jfif","G":"a-z/g.jfif","H":"a-z/h.jfif","I":"a-z/i.jfif","J":"a-z/j.jfif",
+    "K":"a-z/k.jfif","L":"a-z/l.jfif","M":"a-z/m.jfif","N":"a-z/n.jfif","O":"a-z/o.jfif",
+    "P":"a-z/p.jfif","Q":"a-z/q.jfif","R":"a-z/r.jfif","S":"a-z/s.jfif","T":"a-z/t.jfif",
+    "U":"a-z/u.jfif","V":"a-z/v.jfif","W":"a-z/w.jfif","X":"a-z/x.jfif","Y":"a-z/y.jfif","Z":"a-z/z.jfif",
+    "0": "numbers/0.jpg","1": "numbers/1.jpg","2": "numbers/2.jpg","3": "numbers/3.jpg",
+    "4": "numbers/4.jpg","5": "numbers/5.jpg","6": "numbers/6.jpg","7": "numbers/7.jpg",
+    "8": "numbers/8.jpg","9": "numbers/9.jpg","10": "numbers/10.jpg"
+  };
+
+  function convertToSign(){
+    const text = (document.getElementById('textInput').value||'').toUpperCase();
+    const output = document.getElementById('output');
+    output.innerHTML = '';
+    for (let char of text){
+      if (aslImages[char]){
+        const div = document.createElement('div'); div.className = 't2s-sign';
+        const img = document.createElement('img'); 
+        img.src = aslImages[char]; 
+        img.alt = char;
+        img.style.cursor = 'zoom-in';
+
+        // Click to zoom
+        img.addEventListener('click', ()=> {
+          const modal = document.getElementById('zoomModal');
+          const zoomImg = document.getElementById('zoomImg');
+          zoomImg.src = img.src;
+          modal.style.display = 'flex';
+        });
+
+        div.appendChild(img); 
+        output.appendChild(div);
+      } else if (char === ' ') {
+        const space = document.createElement('div'); space.className = 't2s-sign'; space.style.width = '40px'; output.appendChild(space);
+      }
+    }
+  }
+
+  // Close zoom modal when clicked
+  document.getElementById('zoomModal').addEventListener('click', ()=> {
+    document.getElementById('zoomModal').style.display = 'none';
+  });
+
+  document.addEventListener('DOMContentLoaded', ()=> {
+    const convertBtn = document.getElementById('convertBtn');
+    const clearT2S = document.getElementById('clearT2S');
+    if (convertBtn) convertBtn.addEventListener('click', convertToSign);
+    if (clearT2S) clearT2S.addEventListener('click', ()=>{
+      document.getElementById('textInput').value='';
+      document.getElementById('output').innerHTML='';
+    });
+    const textInput = document.getElementById('textInput');
+    if (textInput) textInput.addEventListener('keydown', (e)=>{
+      if (e.key === 'Enter') convertToSign();
+    });
+  });
+  </script>
+
+  <!-- Splash hide after load -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        const splash = document.getElementById('splashScreen');
+        if (splash) splash.classList.add('hidden');
+      }, 8000);
+    });
+
+    
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const menuToggle = document.getElementById('menu-toggle');
+const leftbar = document.querySelector('.leftbar');
+const collapseIcon = document.getElementById('collapse-icon');
+const expandIcon = document.getElementById('expand-icon');
+
+menuToggle.addEventListener('click', () => {
+  const isCollapsed = leftbar.classList.toggle('collapsed');
+  
+  // Update icons and ARIA attribute
+  menuToggle.setAttribute('aria-expanded', !isCollapsed);
+  collapseIcon.classList.toggle('hidden', isCollapsed);
+  expandIcon.classList.toggle('hidden', !isCollapsed);
+});
+
+
+// 2. Voice to Text Logic
+const btnStartVoice = document.getElementById('btnStartVoice');
+const btnStopVoice = document.getElementById('btnStopVoice');
+const voiceTextarea = document.getElementById('voiceTextarea');
+const btnClearSentenceVoice = document.getElementById('btnClearSentenceVoice');
+
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+if (SpeechRecognition && btnStartVoice) {
+  const recognition = new SpeechRecognition();
+  
+  recognition.continuous = true;
+  recognition.interimResults = true; // THIS MUST BE TRUE
+  recognition.lang = 'en-US';
+
+  let grabHistory = ""; // Stores everything said before the current sentence
+
+  btnStartVoice.addEventListener('click', () => {
+    grabHistory = voiceTextarea.value; // Save what's already in the box
+    recognition.start();
+    btnStartVoice.textContent = "Listening...";
+    btnStartVoice.classList.add('animate-pulse', 'bg-red-600');
+  });
+
+  btnStopVoice.addEventListener('click', () => {
+    recognition.stop();
+    btnStartVoice.textContent = "Start";
+    btnStartVoice.classList.remove('animate-pulse', 'bg-red-600');
+  });
+
+  recognition.onresult = (event) => {
+    let interimTranscript = '';
+    let finalTranscript = '';
+
+    for (let i = event.resultIndex; i < event.results.length; ++i) {
+      const transcript = event.results[i][0].transcript;
+      if (event.results[i].isFinal) {
+        finalTranscript += transcript;
+      } else {
+        interimTranscript += transcript;
+      }
+    }
+
+    // Update the textarea live!
+    // We show the old text + the newly finished words + the words you are currently saying.
+    const completedText = (grabHistory ? grabHistory + ' ' : '') + finalTranscript;
+    voiceTextarea.value = completedText + interimTranscript;
+    
+    // Update history if we got a final chunk so it doesn't duplicate
+    if (finalTranscript !== '') {
+        grabHistory = completedText;
+    }
+  };
+
+  recognition.onerror = (event) => {
+    console.error("Speech error: ", event.error);
+  };
+
+  if (btnClearSentenceVoice) {
+    btnClearSentenceVoice.addEventListener('click', () => {
+      voiceTextarea.value = '';
+      grabHistory = '';
+    });
+  }
+}
+    });
+     // This closing brace and parenthesis is crucial!
+  </script>
+
+
+
+
+</body>
+</html>

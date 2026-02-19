@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hand Detection Trainer</title>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<style>
+  body { background: #1e293b; color: #f1f5f9; font-family: sans-serif; margin:0; padding:0;}
+  .container { max-width: 950px; margin: 2rem auto; padding:1rem;}
+  .video-wrapper { position: relative; width: 640px; margin:auto;}
+  video, canvas { border-radius: 12px; }
+  canvas { position: absolute; top:0; left:0; }
+  .panel { display:flex; justify-content:space-around; margin-top:1rem;}
+  .panel div { text-align:center; padding:1rem; border-radius:12px; background: rgba(15,23,42,0.6); width:45%; }
+  .panel h2 { margin:0 0 0.5rem; font-size:1.2rem; color:#a1a1aa; }
+  .big-letter { font-size:4rem; font-weight:bold; color:#22c55e; }
+  .big-sign { font-size:2.5rem; font-weight:bold; color:#3b82f6; }
+  .controls { display:flex; justify-content:center; gap:0.5rem; margin-top:1rem; flex-wrap:wrap;}
+  button,label { cursor:pointer; }
+  button { padding:0.5rem 1rem; border:none; border-radius:8px; color:white; }
+  button.start { background-color:#22c55e; } button.stop { background-color:#ef4444; }
+  button.add { background-color:#6366f1; } button.export { background-color:#facc15; } button.clear { background-color:#ef4444; }
+  input[type="checkbox"] { accent-color:#6366f1; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1 style="text-align:center;">Trainer: Left Alphabet & Right Basic Signs</h1>
+
+  <div class="video-wrapper">
+    <video id="video" playsinline width="640" height="480"></video>
+    <canvas id="canvas" width="640" height="480"></canvas>
+  </div>
+
+  <div class="controls">
+    <label><input type="checkbox" id="showLm" checked /> Show Landmarks</label>
+    <label><input type="checkbox" id="mirror" checked /> Mirror Video</label>
+    <button id="startCam" class="start">Turn On Camera</button>
+    <button id="stopCam" class="stop">Turn Off Camera</button>
+  </div>
+
+  <div class="panel">
+    <div>
+      <h2>Left Hand Alphabet</h2>
+      <div id="leftLetter" class="big-letter">—</div>
+      <input type="text" id="leftLabel" placeholder="Label (A-Z)" maxlength="1" style="margin-top:0.5rem; text-align:center;"/>
+      <button id="addLeft" class="add" style="margin-top:0.5rem;">Add Sample</button>
+    </div>
+    <div>
+      <h2>Right Hand Basic Sign</h2>
+      <div id="rightSign" class="big-sign">—</div>
+      <input type="text" id="rightLabel" placeholder="Label (Word)" style="margin-top:0.5rem; text-align:center;"/>
+      <button id="addRight" class="add" style="margin-top:0.5rem;">Add Sample</button>
+    </div>
+  </div>
+
+  <div class="controls" style="justify-content:center; margin-top:1rem;">
+    <button id="exportData" class="export">Export Dataset</button>
+    <input type="file" id="importData" />
+    <button id="clearData" class="clear">Clear Dataset</button>
+  </div>
+</div>
+
+<script>
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+const showLm = document.getElementById("showLm");
+const mirror = document.getElementById("mirror");
+const startCam = document.getElementById("startCam");
+const stopCam = document.getElementById("stopCam");
+
+const leftLetter = document.getElementById("leftLetter");
+const rightSign = document.getElementById("rightSign");
+
+const leftLabelInput = document.getElementById("leftLabel");
+const rightLabelInput = document.getElementById("rightLabel");
+const addLeftBtn = document.getElementById("addLeft");
+const addRightBtn = document.getElementById("addRight");
+
+const exportDataBtn = document.getElementById("exportData");
+const importDataInput = document.getElementById("importData");
+const clearDataBtn = document.getElementById("clearData");
+
+/* ===== DATASETS ===== */
+let datasetLeft = JSON.parse(localStorage.getItem("alphabet_dataset")||"{}");
+let datasetRight = JSON.parse(localStorage.getItem("basic_dataset")||"{}");
+
+function saveDatasets(){
+  localStorage.setItem("alphabet_dataset", JSON.stringify(datasetLeft));
+  localStorage.setItem("basic_dataset", JSON.stringify(datasetRight));
+}
+
+/* ===== Camera ===== */
+const hands = new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
+hands.setOptions({
+  maxNumHands:2,
+  modelComplexity:1,
+  minDetectionConfidence:0.75,
+  minTrackingConfidence:0.75,
+  selfieMode:true
+});
+hands.onResults(onResults);
+
+const cam = new Camera(video,{
+  onFrame: async()=> await hands.send({image:video}),
+  width:640,height:480
+});
+
+startCam.onclick = async()=>{
+  const stream = await navigator.mediaDevices.getUserMedia({video:true});
+  video.srcObject = stream;
+  await video.play();
+  cam.start();
+};
+
+stopCam.onclick = ()=>{
+  try{ cam.stop(); }catch{}
+  const s = video.srcObject;
+  if(s && s.getTracks) s.getTracks().forEach(t=>t.stop());
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  leftLetter.textContent = "—";
+  rightSign.textContent = "—";
+};
+
+/* ===== Landmark Smoothing ===== */
+let prevLmLeft = null;
+let prevLmRight = null;
+function smooth(lm, prev, a=0.55){
+  if(!prev) return lm.map(p=>({...p}));
+  const out = lm.map((p,i)=>({x:a*prev[i].x+(1-a)*p.x, y:a*prev[i].y+(1-a)*p.y, z:a*prev[i].z+(1-a)*p.z}));
+  return out;
+}
+
+/* ===== Features ===== */
+function extractFeatures(lm,w,h){
+  const pts = lm.map(p=>({x:p.x*w,y:p.y*h,z:p.z*w}));
+  const origin = pts[0];
+  const rel = pts.map(p=>({x:p.x-origin.x,y:p.y-origin.y,z:p.z-origin.z}));
+  let maxd = 0; rel.forEach(p=> maxd = Math.max(maxd,Math.hypot(p.x,p.y,p.z)));
+  maxd = Math.max(maxd,1);
+  return rel.map(p=>[p.x/maxd,p.y/maxd,p.z/maxd]).flat();
+}
+
+/* ===== Nearest Centroid Classifier ===== */
+function centroid(list){ const c=new Array(list[0].length).fill(0); list.forEach(v=>v.forEach((x,i)=>c[i]+=x)); return c.map(x=>x/list.length); }
+function dot(a,b){let s=0;for(let i=0;i<a.length;i++) s+=a[i]*b[i]; return s; }
+function norm(a){return Math.sqrt(dot(a,a));}
+function cosine(a,b){return dot(a,b)/((norm(a)*norm(b))||1e-6);}
+function predict(feat,dataset){
+  let best={label:"—",conf:-1};
+  for(const L in dataset){
+    const c = centroid(dataset[L]);
+    let sim = cosine(feat,c);
+    if(sim>best.conf) best={label:L,conf:sim};
+  }
+  return best;
+}
+
+/* ===== Handle Frames ===== */
+function onResults(results){
+  ctx.save();
+  if(mirror.checked){ ctx.translate(canvas.width,0); ctx.scale(-1,1); }
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(results.image,0,0,canvas.width,canvas.height);
+
+  if(results.multiHandLandmarks && results.multiHandLandmarks.length){
+    results.multiHandLandmarks.forEach((lm,i)=>{
+      const handLabel = results.multiHandedness[i].label; // Left or Right
+      if(handLabel==="Left"){
+        const smoothLm = smooth(lm, prevLmLeft);
+        prevLmLeft = smoothLm.map(p=>({...p}));
+        if(showLm.checked) drawHand(smoothLm,'#22c55e');
+        const feat = extractFeatures(smoothLm,canvas.width,canvas.height);
+        const out = predict(feat,datasetLeft);
+        leftLetter.textContent = out.label;
+      }
+      if(handLabel==="Right"){
+        const smoothLm = smooth(lm, prevLmRight);
+        prevLmRight = smoothLm.map(p=>({...p}));
+        if(showLm.checked) drawHand(smoothLm,'#3b82f6');
+        const feat = extractFeatures(smoothLm,canvas.width,canvas.height);
+        const out = predict(feat,datasetRight);
+        rightSign.textContent = out.label;
+      }
+    });
+  } else {
+    leftLetter.textContent = "—";
+    rightSign.textContent = "—";
+  }
+  ctx.restore();
+}
+
+function drawHand(lm,color){
+  if(window.HAND_CONNECTIONS) drawConnectors(ctx,lm,window.HAND_CONNECTIONS,{color:color,lineWidth:3});
+  lm.forEach(p=>{
+    ctx.beginPath();
+    ctx.arc(p.x*canvas.width,p.y*canvas.height,5,0,2*Math.PI);
+    ctx.fillStyle=color;
+    ctx.fill();
+  });
+}
+
+/* ===== Add Samples ===== */
+addLeftBtn.onclick = ()=>{
+  const label = leftLabelInput.value.trim().toUpperCase();
+  if(!label) return alert("Enter a label for left hand");
+  if(!prevLmLeft) return alert("Show left hand first");
+  const feat = extractFeatures(prevLmLeft,canvas.width,canvas.height);
+  if(!datasetLeft[label]) datasetLeft[label]=[];
+  datasetLeft[label].push(feat);
+  saveDatasets();
+  alert(`Added sample for ${label}`);
+};
+
+addRightBtn.onclick = ()=>{
+  const label = rightLabelInput.value.trim();
+  if(!label) return alert("Enter a label for right hand");
+  if(!prevLmRight) return alert("Show right hand first");
+  const feat = extractFeatures(prevLmRight,canvas.width,canvas.height);
+  if(!datasetRight[label]) datasetRight[label]=[];
+  datasetRight[label].push(feat);
+  saveDatasets();
+  alert(`Added sample for ${label}`);
+};
+
+/* ===== Export / Import ===== */
+exportDataBtn.onclick = ()=>{
+  const data = {left:datasetLeft,right:datasetRight};
+  const blob = new Blob([JSON.stringify(data)],{type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "hand_trainer_dataset.json";
+  a.click();
+};
+
+importDataInput.onchange = async e=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const text = await file.text();
+  const data = JSON.parse(text);
+  if(data.left) datasetLeft = {...datasetLeft,...data.left};
+  if(data.right) datasetRight = {...datasetRight,...data.right};
+  saveDatasets();
+  alert("Imported dataset!");
+};
+
+clearDataBtn.onclick = ()=>{
+  if(confirm("Clear all datasets?")){
+    datasetLeft={}; datasetRight={};
+    saveDatasets();
+    alert("Datasets cleared!");
+  }
+};
+</script>
+</body>
+</html>
