@@ -807,7 +807,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   <div class="video-box">
     <video autoplay muted loop playsinline>
-      <source src="pictures/2.mp4" type="video/mp4">
+      <source src="pictures/demuvid.mp4" type="video/mp4">
       Your browser does not support the video tag.
     </video>
   </div>
@@ -851,23 +851,23 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <button class="home-nav-btn" data-target="about">
-          
+         
             <span>About Us</span>
           </button>
           <button class="home-nav-btn" data-target="sign">
-   
+          
             <span>Hand Alphabet</span>
           </button>
           <button class="home-nav-btn" data-target="handnumber">
-            
+           
             <span>Hand Number</span>
           </button>
           <button class="home-nav-btn" data-target="text2sign">
-         
+           
             <span>Chat To Sign</span>
           </button>
           <button class="home-nav-btn" data-target="voice">
-            
+         
             <span>Voice To Text</span>
           </button>
           <button class="home-nav-btn" data-target="help">
@@ -955,6 +955,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
        
 <section id="about" class="section hidden team-section" aria-labelledby="about-title">
+
+
+  <div class="video-box">
+    <video autoplay muted loop playsinline>
+      <source src="pictures/2.mp4" type="video/mp4">
+      Your browser does not support the video tag.
+    </video>
+  </div>
+  
+  <style>
+  .video-box {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 30px;
+  }
+  
+  .video-box video {
+    width: 500px;         /* 👈 video width (adjust as you like) */
+    height: 240px;        /* 👈 video height (for horizontal look) */
+    border-radius: 25px;  /* rounded corners */
+    object-fit: cover;    /* crops to fit the shape cleanly */
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  
+  .video-box video:hover {
+    transform: scale(1.03);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+  }
+  
+  /* Responsive for mobile screens */
+  @media (max-width: 768px) {
+    .video-box video {
+      width: 90%;
+      height: auto;
+    }
+  }
+  </style>
+
 
 
   <div class="image-box">
@@ -1806,7 +1846,10 @@ btnAutoOff.addEventListener("click", () => {
 <section id="handnumber" class="section hidden">
   <div class="max-w-7xl mx-auto p-4">
     <header class="flex items-center justify-between mb-4">
-      <h1 class="text-2xl md:text-3xl font-bold">Hand Number Detection</h1>
+      <h1 class="text-2xl md:text-3xl font-bold">Hand Number Detection Note: Use Left Hand 
+       
+      </h1>
+      
     </header>
 
     <section class="grid md:grid-cols-2 gap-6 items-start">
@@ -2191,32 +2234,131 @@ btnAutoOff.addEventListener("click", () => {
 </script>
 
       </section>
-
-      <!-- VOICE -->
-      <section id="voice" class="section hidden">
-        <div class="max-w-7xl mx-auto px-6 lg:px-8 py-12 lg:py-16">
-          <div class="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <h2 class="text-3xl font-extrabold tracking-tight">Voice to Text</h2>
-              <p class="text-white/70 mt-2">Press start to dictate. </p>
-            </div>
-            <div class="flex items-center gap-2">
-              <button id="btnStartVoice" class="px-4 py-2 rounded-lg bg-brand-600 text-white font-semibold">Start</button>
-              <button id="btnStopVoice" class="px-4 py-2 rounded-lg bg-white/10 text-white/80">Stop</button>
-            </div>
-          </div>
-          <div class="mt-8 rounded-2xl bg-white/5 ring-1 ring-white/10 p-4">
-            <div class="grid md:grid-cols-3 gap-3 items-center">
-             
-            </div>
-            <textarea id="voiceTextarea" rows="6" class="w-full rounded-xl bg-slate-950 p-3 resize-y text-white mt-4" placeholder="Transcription will appear here..."></textarea>
-            <div class="mt-3 flex flex-wrap gap-2">
-              <button id="btnAddVoiceToSentence" class="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500">Add to Sentence</button>
-              <button id="btnClearSentenceVoice" class="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500">Clear Sentences</button>
-            </div>
-          </div>
+  <!-- VOICE -->
+  <section id="voice" class="section hidden">
+    <div class="max-w-7xl mx-auto px-6 lg:px-8 py-12 lg:py-16 text-white">
+      <div class="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h2 class="text-3xl font-extrabold tracking-tight">Voice to Text</h2>
+          <p id="voiceStatus" class="text-white/70 mt-2">Press start to dictate.</p>
         </div>
-      </section>
+        <div class="flex items-center gap-2">
+          <button id="btnStartVoice" class="px-6 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white font-semibold transition-all">
+            Start Audio
+          </button>
+          <button id="btnStopVoice" class="hidden px-6 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-semibold transition-all">
+            Stop Audio
+          </button>
+        </div>
+      </div>
+  
+      <div class="mt-8 rounded-2xl bg-white/5 ring-1 ring-white/10 p-4">
+        <textarea id="voiceTextarea" rows="6" 
+          class="w-full rounded-xl bg-slate-950 p-4 resize-y text-white border border-white/10 focus:ring-2 focus:ring-indigo-500 outline-none" 
+          placeholder="Transcription will appear here..."></textarea>
+        
+        <div class="mt-3 flex flex-wrap gap-2">
+          <button id="btnClearSentenceVoice" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm font-medium transition-colors">
+            Clear Text
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    const btnStart = document.getElementById('btnStartVoice');
+    const btnStop = document.getElementById('btnStopVoice');
+    const textarea = document.getElementById('voiceTextarea');
+    const statusText = document.getElementById('voiceStatus');
+    const btnClear = document.getElementById('btnClearSentenceVoice');
+  
+    let recognition;
+    let silenceTimer;
+  
+    // Check for Speech Recognition API
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  
+    if (SpeechRecognition) {
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+  
+      // 1. START LISTENING
+      btnStart.addEventListener('click', () => {
+        recognition.start();
+      });
+  
+      // 2. STOP LISTENING (MANUAL)
+      btnStop.addEventListener('click', () => {
+        recognition.stop();
+      });
+  
+      recognition.onstart = () => {
+        toggleButtons(true);
+        statusText.innerText = "Listening... (Auto-stops after 5s of silence)";
+        statusText.classList.add('text-green-400');
+        resetSilenceTimer();
+      };
+  
+      recognition.onresult = (event) => {
+        resetSilenceTimer(); // Reset the 5s clock on every detected word
+        let interimTranscript = '';
+        let finalTranscript = '';
+  
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          } else {
+            interimTranscript += event.results[i][0].transcript;
+          }
+        }
+        
+        // Update the textarea
+        if (finalTranscript) {
+          textarea.value += finalTranscript + ' ';
+        }
+      };
+  
+      recognition.onend = () => {
+        toggleButtons(false);
+        statusText.innerText = "Audio turned off.";
+        statusText.classList.remove('text-green-400');
+        clearTimeout(silenceTimer);
+      };
+  
+      // 3. AUTO-STOP LOGIC (5 SECONDS)
+      function resetSilenceTimer() {
+        clearTimeout(silenceTimer);
+        silenceTimer = setTimeout(() => {
+          recognition.stop();
+        }, 5000);
+      }
+  
+      // 4. BUTTON SWAP LOGIC
+      function toggleButtons(isRecording) {
+        if (isRecording) {
+          btnStart.classList.add('hidden');
+          btnStop.classList.remove('hidden');
+        } else {
+          btnStart.classList.remove('hidden');
+          btnStop.classList.add('hidden');
+        }
+      }
+  
+    } else {
+      statusText.innerText = "Speech recognition not supported in this browser.";
+      btnStart.disabled = true;
+      btnStart.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+  
+    // Clear Text functionality
+    btnClear.addEventListener('click', () => {
+      textarea.value = "";
+    });
+  </script>
+
 
 
       <!-- HELP and SETTINGS sections (kept intact) -->
@@ -2530,52 +2672,7 @@ function onResults(results) {
 }
 
 
-    /* Speech recognition setup (keeps your original) */
-    let globalRecognition = null; let globalRecognizing = false; let defaultVoiceLang = localStorage.getItem('demu_default_voice_lang') || 'en-US';
-    (function initSpeechRecognition(){
-        const btnStartVoice = document.getElementById('btnStartVoice');
-        const btnStopVoice = document.getElementById('btnStopVoice');
-        const voiceTextarea = document.getElementById('voiceTextarea');
-        const btnAddVoiceToSentence = document.getElementById('btnAddVoiceToSentence');
-        const btnClearSentenceVoice = document.getElementById('btnClearSentenceVoice');
-        const voiceLangSelect = document.getElementById('voiceLangSelect');
-        const voiceLangCustom = document.getElementById('voiceLangCustom');
-        const voiceLangStatus = document.getElementById('voiceLangStatus');
-        try {
-            if (voiceLangSelect) {
-                const opts = Array.from(voiceLangSelect.options).map(o=>o.value);
-                if (opts.includes(defaultVoiceLang)) { voiceLangSelect.value = defaultVoiceLang; voiceLangCustom.classList.add('hidden'); } else { voiceLangSelect.value='custom'; voiceLangCustom.classList.remove('hidden'); voiceLangCustom.value = defaultVoiceLang; }
-            }
-            if (voiceLangStatus) voiceLangStatus.textContent = 'Current: ' + defaultVoiceLang;
-        } catch(e){}
-        if (!btnStartVoice || !btnStopVoice || !voiceTextarea) return;
-        function createRecognition(lang){ if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) return null; const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition; try { const r = new SpeechRecognition(); r.lang = lang || (defaultVoiceLang || 'en-US'); r.continuous = true; r.interimResults = true; r.onresult = (event)=>{ let combinedTranscript=''; for(let i=0;i<event.results.length;i++) combinedTranscript += event.results[i][0].transcript; voiceTextarea.value = combinedTranscript; }; r.onstart = ()=>{ globalRecognizing = true; try{ btnStartVoice.textContent = 'Listening…'; }catch(e){} }; r.onerror = (e)=>{ console.warn('Speech recognition error', e); }; r.onend = ()=>{ globalRecognizing = false; try{ btnStartVoice.textContent = 'Start'; }catch(e){} }; return r; } catch(err){ console.warn('SpeechRecognition creation failed', err); return null; } }
-        function setRecognitionLanguage(code){ if (!code) return; defaultVoiceLang = code; localStorage.setItem('demu_default_voice_lang', code); if (voiceLangStatus) voiceLangStatus.textContent = 'Current: ' + code; try { const wasListening = globalRecognizing; if (globalRecognition && globalRecognizing) { globalRecognition.onend = null; globalRecognition.stop(); } globalRecognition = createRecognition(code); if (wasListening && globalRecognition) { setTimeout(()=>{ try{ globalRecognition.start(); }catch(e){ console.warn('Restart failed', e); } }, 250); } } catch(err){ console.warn('Failed to change recognition language', err); } }
-        window.setRecognitionLanguage = setRecognitionLanguage;
-        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-            globalRecognition = createRecognition(defaultVoiceLang);
-            if (voiceLangStatus) voiceLangStatus.textContent = 'Current: ' + (defaultVoiceLang || 'unknown');
-            btnStartVoice.addEventListener('click', ()=>{ try{ if (!globalRecognition) globalRecognition = createRecognition(defaultVoiceLang); if (globalRecognition && !globalRecognizing) { globalRecognition.start(); } } catch(e){ console.warn('Recognition start failed', e); } });
-            btnStopVoice.addEventListener('click', ()=>{ try{ if (globalRecognition && globalRecognizing) globalRecognition.stop(); } catch(e){ console.warn('Recognition stop failed', e); } });
-            btnAddVoiceToSentence && btnAddVoiceToSentence.addEventListener('click', ()=>{ const txt = (voiceTextarea.value||'').trim(); if (!txt){ alert('No transcribed text to add. Speak first or wait for transcription.'); return; } if (sentence.value && !sentence.value.endsWith(' ')) sentence.value += ' '; sentence.value += txt; });
-            btnClearSentenceVoice && btnClearSentenceVoice.addEventListener('click', clearSentences);
-            if (voiceLangSelect) { voiceLangSelect.addEventListener('change', (e)=>{ const v = e.target.value; if (v==='custom'){ voiceLangCustom.classList.remove('hidden'); voiceLangCustom.focus(); } else { voiceLangCustom.classList.add('hidden'); setRecognitionLanguage(v); } }); }
-            if (voiceLangCustom) { voiceLangCustom.addEventListener('change',(e)=>{ const code=(e.target.value||'').trim(); if (code) { setRecognitionLanguage(code); try{ voiceLangSelect.value='custom'; }catch(e){} } }); voiceLangCustom.addEventListener('keydown',(ev)=>{ if (ev.key==='Enter'){ const code=(voiceLangCustom.value||'').trim(); if (code) setRecognitionLanguage(code); } }); }
-        } else {
-            btnStartVoice.disabled = true; btnStopVoice.disabled = true; if (voiceTextarea) voiceTextarea.value = "⚠️ Speech Recognition not supported in this browser. Use Chrome or Edge.";
-        }
-    })();
-    (function initSettingsUI(){
-        const settingsLangSelect = document.getElementById('settingsLangSelect');
-        const settingsLangCustom = document.getElementById('settingsLangCustom');
-        const btnSaveLang = document.getElementById('btnSaveLang');
-        const storedLang = localStorage.getItem('demu_default_voice_lang') || defaultVoiceLang || 'en-US';
-        if (settingsLangSelect){ const opts = Array.from(settingsLangSelect.options).map(o=>o.value); if (opts.includes(storedLang)) { settingsLangSelect.value = storedLang; if (settingsLangCustom) settingsLangCustom.classList.add('hidden'); } else { settingsLangSelect.value = 'custom'; if (settingsLangCustom){ settingsLangCustom.classList.remove('hidden'); settingsLangCustom.value = storedLang; } } }
-        if (settingsLangSelect) { settingsLangSelect.addEventListener('change',(e)=>{ if (e.target.value === 'custom'){ if (settingsLangCustom) settingsLangCustom.classList.remove('hidden'); if (settingsLangCustom) settingsLangCustom.focus(); } else { if (settingsLangCustom) settingsLangCustom.classList.add('hidden'); } }); }
-        if (settingsLangCustom) { settingsLangCustom.addEventListener('keydown',(ev)=>{ if (ev.key === 'Enter'){ btnSaveLang?.click(); } }); }
-        if (btnSaveLang) { btnSaveLang.addEventListener('click', ()=>{ let code = settingsLangSelect.value; if (code === 'custom' && settingsLangCustom) { code = (settingsLangCustom.value||'').trim(); if (!code) { alert('Please enter a BCP-47 language code (e.g. en-AU)'); return; } } localStorage.setItem('demu_default_voice_lang', code); try { const voiceLangSelect = document.getElementById('voiceLangSelect'); const voiceLangCustom = document.getElementById('voiceLangCustom'); if (voiceLangSelect){ const opts = Array.from(voiceLangSelect.options).map(o=>o.value); if (opts.includes(code)) { voiceLangSelect.value = code; if (voiceLangCustom) voiceLangCustom.classList.add('hidden'); } else { voiceLangSelect.value = 'custom'; if (voiceLangCustom){ voiceLangCustom.classList.remove('hidden'); voiceLangCustom.value = code; } } } if (window.setRecognitionLanguage) window.setRecognitionLanguage(code); alert('Default recognition language saved: ' + code); } catch(e){ console.warn('Failed to save/apply language', e); } }); }
-    })();
-    /* -- END preserved core script -- */
+
   </script>
 
 
@@ -2668,71 +2765,6 @@ menuToggle.addEventListener('click', () => {
 });
 
 
-// 2. Voice to Text Logic
-const btnStartVoice = document.getElementById('btnStartVoice');
-const btnStopVoice = document.getElementById('btnStopVoice');
-const voiceTextarea = document.getElementById('voiceTextarea');
-const btnClearSentenceVoice = document.getElementById('btnClearSentenceVoice');
-
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-if (SpeechRecognition && btnStartVoice) {
-  const recognition = new SpeechRecognition();
-  
-  recognition.continuous = true;
-  recognition.interimResults = true; // THIS MUST BE TRUE
-  recognition.lang = 'en-US';
-
-  let grabHistory = ""; // Stores everything said before the current sentence
-
-  btnStartVoice.addEventListener('click', () => {
-    grabHistory = voiceTextarea.value; // Save what's already in the box
-    recognition.start();
-    btnStartVoice.textContent = "Listening...";
-    btnStartVoice.classList.add('animate-pulse', 'bg-red-600');
-  });
-
-  btnStopVoice.addEventListener('click', () => {
-    recognition.stop();
-    btnStartVoice.textContent = "Start";
-    btnStartVoice.classList.remove('animate-pulse', 'bg-red-600');
-  });
-
-  recognition.onresult = (event) => {
-    let interimTranscript = '';
-    let finalTranscript = '';
-
-    for (let i = event.resultIndex; i < event.results.length; ++i) {
-      const transcript = event.results[i][0].transcript;
-      if (event.results[i].isFinal) {
-        finalTranscript += transcript;
-      } else {
-        interimTranscript += transcript;
-      }
-    }
-
-    // Update the textarea live!
-    // We show the old text + the newly finished words + the words you are currently saying.
-    const completedText = (grabHistory ? grabHistory + ' ' : '') + finalTranscript;
-    voiceTextarea.value = completedText + interimTranscript;
-    
-    // Update history if we got a final chunk so it doesn't duplicate
-    if (finalTranscript !== '') {
-        grabHistory = completedText;
-    }
-  };
-
-  recognition.onerror = (event) => {
-    console.error("Speech error: ", event.error);
-  };
-
-  if (btnClearSentenceVoice) {
-    btnClearSentenceVoice.addEventListener('click', () => {
-      voiceTextarea.value = '';
-      grabHistory = '';
-    });
-  }
-}
     });
      // This closing brace and parenthesis is crucial!
   </script>
@@ -2742,5 +2774,3 @@ if (SpeechRecognition && btnStartVoice) {
 
 </body>
 </html>
-
-
